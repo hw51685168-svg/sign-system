@@ -1,0 +1,1235 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleKey {
+  GENERAL_MANAGER
+  EXECUTIVE_ASSISTANT
+  ADMIN_MANAGER
+  ACCOUNTING_MANAGER
+  DESIGN_MANAGER
+  SOCIAL_MEDIA_MANAGER
+  HR_MANAGER
+  CONSTRUCTION_MANAGER
+  BRANCH_MANAGER
+  MANAGER
+  STAFF
+  STORE_STAFF
+  SYSTEM_ADMIN
+  TESTER
+}
+
+enum ScopeLevel {
+  GLOBAL
+  BUSINESS_UNIT
+  DEPARTMENT
+  BRANCH
+  SELF
+  ASSIGNED
+}
+
+enum ApprovalMode {
+  CHECKBOX
+  HANDWRITTEN
+  MIXED
+}
+
+enum ChatConversationType {
+  DIRECT
+  DEPARTMENT
+  CROSS_DEPARTMENT
+  TASK
+  APPROVAL
+  ISSUE
+  SERVICE_REQUEST
+  ANNOUNCEMENT
+  EMERGENCY
+}
+
+enum ChatMessageType {
+  TEXT
+  IMAGE
+  FILE
+  VOICE
+  SYSTEM
+}
+
+enum TranscriptionStatus {
+  NONE
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum NotificationStatus {
+  CREATED
+  SENT
+  DELIVERED
+  READ
+  CLICKED
+  FAILED
+  ESCALATED
+}
+
+enum ServiceRequestStatus {
+  SUBMITTED
+  ACCEPTED
+  IN_PROGRESS
+  WAITING_CONFIRMATION
+  COMPLETED
+  REJECTED
+  CLOSED
+}
+
+enum ApprovalType {
+  PURCHASE
+  REPAIR
+  HR
+  DESIGN
+  SOCIAL_MEDIA
+  INVENTORY_RESTOCK
+  CUSTOMER_COMPLAINT
+  STORE_INCIDENT
+  TRAINING
+  OTHER
+}
+
+enum ApprovalStatus {
+  DRAFT
+  SUBMITTED
+  REVIEWING
+  NEEDS_REVISION
+  APPROVED
+  REJECTED
+  IN_PROGRESS
+  CLOSED
+}
+
+enum ApprovalAction {
+  SUBMIT
+  APPROVE
+  REJECT
+  REQUEST_REVISION
+  ADD_APPROVER
+  TRANSFER
+  COMMENT
+  CLOSE
+}
+
+enum AnnouncementTargetType {
+  ALL
+  DEPARTMENT
+  STORE
+  ROLE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  WAITING_CONFIRMATION
+  REJECTED
+  COMPLETED
+  OVERDUE
+  CANCELLED
+}
+
+enum IssueType {
+  CUSTOMER_COMPLAINT
+  EQUIPMENT_REPAIR
+  PERSONNEL
+  CLEANLINESS
+  SHORTAGE
+  SYSTEM
+  EMERGENCY
+  OTHER
+}
+
+enum IssueSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IssueStatus {
+  OPEN
+  ASSIGNED
+  PROCESSING
+  WAITING_CONFIRMATION
+  CLOSED
+}
+
+enum InventoryUrgency {
+  NORMAL
+  URGENT
+  EMERGENCY
+}
+
+enum InventoryReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ShipmentStatus {
+  NOT_SHIPPED
+  PREPARING
+  SHIPPED
+  RECEIVED
+}
+
+enum AuditRecordStatus {
+  DRAFT
+  SUBMITTED
+  IMPROVEMENT_REQUIRED
+  CLOSED
+}
+
+enum NotificationPriority {
+  URGENT
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum NotificationChannel {
+  IN_APP
+  PUSH
+  EMAIL
+  LINE
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum PilotDeviceType {
+  PHONE
+  DESKTOP
+  TABLET
+}
+
+enum PilotBugType {
+  UI
+  PERMISSION
+  NOTIFICATION
+  VOICE
+  APPROVAL
+  TASK
+  MOBILE
+  OTHER
+}
+
+enum PilotSeverity {
+  P0
+  P1
+  P2
+  P3
+}
+
+enum PilotStatus {
+  OPEN
+  TRIAGED
+  IN_PROGRESS
+  DONE
+}
+
+enum ErrorSeverity {
+  P0
+  P1
+  P2
+  P3
+}
+
+enum ErrorReportStatus {
+  OPEN
+  TRIAGED
+  CODEX_REQUESTED
+  IN_PROGRESS
+  FIXED
+  VERIFIED
+  CLOSED
+  IGNORED
+}
+
+enum CodexFixRequestStatus {
+  DRAFT
+  READY
+  SENT_TO_CODEX
+  GITHUB_ISSUE_CREATED
+  IN_PROGRESS
+  FIX_PROPOSED
+  FIXED
+  VERIFIED
+  CLOSED
+  REJECTED
+}
+
+model User {
+  id             String    @id @default(cuid())
+  name           String
+  email          String    @unique
+  passwordHash   String
+  roleId         String
+  businessUnitId String?
+  departmentId   String?
+  storeId        String?
+  isActive       Boolean   @default(true)
+  lastLoginAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  role                        Role                      @relation(fields: [roleId], references: [id])
+  businessUnit                BusinessUnit?             @relation(fields: [businessUnitId], references: [id])
+  department                  Department?               @relation(fields: [departmentId], references: [id])
+  store                       Store?                    @relation(fields: [storeId], references: [id])
+  approvalRequests            ApprovalRequest[]         @relation("ApprovalApplicant")
+  approvalSteps               ApprovalStep[]            @relation("ApprovalStepApprover")
+  approvalLogs                ApprovalLog[]             @relation("ApprovalLogActor")
+  announcementReads           AnnouncementRead[]
+  assignedTasks               Task[]                    @relation("TaskOwner")
+  assistedTasks               TaskAssistant[]
+  taskComments                TaskComment[]
+  reportedIssues              IssueReport[]             @relation("IssueReporter")
+  assignedIssues              IssueReport[]             @relation("IssueAssignee")
+  issueLogs                   IssueLog[]                @relation("IssueLogActor")
+  auditRecords                AuditRecord[]             @relation("AuditInspector")
+  inventoryRequests           InventoryRequest[]        @relation("InventoryApplicant")
+  attachments                 Attachment[]              @relation("AttachmentUploader")
+  createdTasks                Task[]                    @relation("TaskCreator")
+  createdAnnouncements        Announcement[]            @relation("AnnouncementPublisher")
+  createdAuditForms           AuditForm[]               @relation("AuditFormCreator")
+  createdApprovalSteps        ApprovalStep[]            @relation("ApprovalStepCreator")
+  notifications               Notification[]
+  serviceRequestsCreated      ServiceRequest[]          @relation("ServiceRequestRequester")
+  serviceRequestsOwned        ServiceRequest[]          @relation("ServiceRequestOwner")
+  serviceRequestsAssisted     ServiceRequestAssistant[]
+  serviceRequestLogs          ServiceRequestLog[]
+  approvalSignatures          ApprovalSignature[]
+  auditLogs                   AuditLog[]
+  notificationEscalationsFrom NotificationEscalation[]  @relation("NotificationEscalationFrom")
+  notificationEscalationsTo   NotificationEscalation[]  @relation("NotificationEscalationTo")
+  pushSubscriptions           PushSubscription[]
+  notificationPreferences     NotificationPreference?
+  notificationLogs            NotificationLog[]
+  chatConversationsCreated    ChatConversation[]        @relation("ChatConversationCreator")
+  chatMemberships             ChatConversationMember[]
+  chatMessages                ChatMessage[]
+  voiceMessagesSent           VoiceMessage[]
+  voiceMessageListens         VoiceMessageListen[]
+  pilotChecklistItems         PilotChecklistItem[]
+  pilotFeedbacks              PilotFeedback[]           @relation("PilotFeedbackTester")
+  pilotBugReports             PilotBugReport[]          @relation("PilotBugReporter")
+  errorReports                ErrorReport[]             @relation("ErrorReportUser")
+  resolvedErrorReports        ErrorReport[]             @relation("ErrorReportResolver")
+  codexFixRequestsCreated     CodexFixRequest[]         @relation("CodexFixRequestCreator")
+}
+
+model Role {
+  id          String     @id @default(cuid())
+  key         RoleKey    @unique
+  name        String
+  description String?
+  scope       ScopeLevel @default(ASSIGNED)
+  permissions String[]   @default([])
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  users User[]
+}
+
+model BusinessUnit {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users           User[]
+  departments     Department[]
+  stores          Store[]
+  serviceRequests ServiceRequest[]
+}
+
+model Department {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  description    String?
+  businessUnitId String?
+  parentId       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  businessUnit                 BusinessUnit?              @relation(fields: [businessUnitId], references: [id])
+  parent                       Department?                @relation("DepartmentTree", fields: [parentId], references: [id])
+  children                     Department[]               @relation("DepartmentTree")
+  users                        User[]
+  stores                       Store[]
+  approvalRequests             ApprovalRequest[]
+  announcementTargets          AnnouncementTarget[]
+  tasks                        Task[]
+  issueReports                 IssueReport[]              @relation("IssueTargetDepartment")
+  serviceRequestsFrom          ServiceRequest[]           @relation("ServiceRequestRequesterDepartment")
+  serviceRequestsResponsible   ServiceRequest[]           @relation("ServiceRequestResponsibleDepartment")
+  serviceRequestCollaborations ServiceRequestDepartment[]
+  chatConversations            ChatConversation[]
+}
+
+model Store {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  brand          String?
+  businessUnitId String?
+  departmentId   String?
+  address        String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  businessUnit        BusinessUnit?        @relation(fields: [businessUnitId], references: [id])
+  department          Department?          @relation(fields: [departmentId], references: [id])
+  users               User[]
+  approvalRequests    ApprovalRequest[]
+  announcementTargets AnnouncementTarget[]
+  issueReports        IssueReport[]
+  auditRecords        AuditRecord[]
+  inventoryRequests   InventoryRequest[]
+  serviceRequests     ServiceRequest[]
+  tasks               Task[]
+  chatConversations   ChatConversation[]
+}
+
+model ApprovalRequest {
+  id             String         @id @default(cuid())
+  requestNo      String         @unique
+  applicantId    String
+  departmentId   String?
+  storeId        String?
+  type           ApprovalType
+  subject        String
+  description    String
+  amount         Decimal?       @db.Decimal(12, 2)
+  approvalMode   ApprovalMode   @default(CHECKBOX)
+  contentVersion Int            @default(1)
+  status         ApprovalStatus @default(DRAFT)
+  currentStep    Int            @default(1)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  applicant             User                @relation("ApprovalApplicant", fields: [applicantId], references: [id])
+  department            Department?         @relation(fields: [departmentId], references: [id])
+  store                 Store?              @relation(fields: [storeId], references: [id])
+  steps                 ApprovalStep[]
+  logs                  ApprovalLog[]
+  signatures            ApprovalSignature[]
+  attachments           Attachment[]
+  attachedVoiceMessages VoiceMessage[]      @relation("VoiceAttachedApproval")
+}
+
+model ApprovalSignature {
+  id                String   @id @default(cuid())
+  approvalRequestId String
+  signerId          String
+  signatureDataUrl  String
+  contentSnapshot   String
+  signedAt          DateTime @default(now())
+  ipAddress         String?
+  userAgent         String?
+  createdAt         DateTime @default(now())
+
+  approvalRequest ApprovalRequest @relation(fields: [approvalRequestId], references: [id], onDelete: Cascade)
+  signer          User            @relation(fields: [signerId], references: [id])
+
+  @@unique([approvalRequestId, signerId])
+}
+
+model ApprovalStep {
+  id                String    @id @default(cuid())
+  approvalRequestId String
+  stepOrder         Int
+  approverId        String?
+  roleId            String?
+  departmentId      String?
+  title             String
+  isCompleted       Boolean   @default(false)
+  completedAt       DateTime?
+  createdById       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  approvalRequest ApprovalRequest @relation(fields: [approvalRequestId], references: [id], onDelete: Cascade)
+  approver        User?           @relation("ApprovalStepApprover", fields: [approverId], references: [id])
+  createdBy       User?           @relation("ApprovalStepCreator", fields: [createdById], references: [id])
+}
+
+model ApprovalLog {
+  id                String          @id @default(cuid())
+  approvalRequestId String
+  actorId           String
+  action            ApprovalAction
+  comment           String?
+  fromStatus        ApprovalStatus?
+  toStatus          ApprovalStatus?
+  ipAddress         String?
+  userAgent         String?
+  createdAt         DateTime        @default(now())
+
+  approvalRequest ApprovalRequest @relation(fields: [approvalRequestId], references: [id], onDelete: Cascade)
+  actor           User            @relation("ApprovalLogActor", fields: [actorId], references: [id])
+}
+
+model Announcement {
+  id                  String   @id @default(cuid())
+  title               String
+  content             String
+  requireConfirmation Boolean  @default(true)
+  publisherId         String
+  publishedAt         DateTime @default(now())
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  publisher   User                 @relation("AnnouncementPublisher", fields: [publisherId], references: [id])
+  targets     AnnouncementTarget[]
+  reads       AnnouncementRead[]
+  attachments Attachment[]
+}
+
+model AnnouncementTarget {
+  id             String                 @id @default(cuid())
+  announcementId String
+  type           AnnouncementTargetType
+  departmentId   String?
+  storeId        String?
+  roleId         String?
+  createdAt      DateTime               @default(now())
+
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  department   Department?  @relation(fields: [departmentId], references: [id])
+  store        Store?       @relation(fields: [storeId], references: [id])
+}
+
+model AnnouncementRead {
+  id             String   @id @default(cuid())
+  announcementId String
+  userId         String
+  readAt         DateTime @default(now())
+
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@unique([announcementId, userId])
+}
+
+model Task {
+  id            String       @id @default(cuid())
+  title         String
+  content       String
+  ownerId       String
+  creatorId     String
+  departmentId  String?
+  storeId       String?
+  dueDate       DateTime?
+  priority      TaskPriority @default(MEDIUM)
+  status        TaskStatus   @default(NOT_STARTED)
+  progress      Int          @default(0)
+  reportContent String?
+  sourceType    String?
+  sourceId      String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  owner            User             @relation("TaskOwner", fields: [ownerId], references: [id])
+  creator          User             @relation("TaskCreator", fields: [creatorId], references: [id])
+  department       Department?      @relation(fields: [departmentId], references: [id])
+  store            Store?           @relation(fields: [storeId], references: [id])
+  assistants       TaskAssistant[]
+  comments         TaskComment[]
+  attachments      Attachment[]
+  voiceConversions VoiceMessage[]   @relation("VoiceConvertedTask")
+  pilotFeedbacks   PilotFeedback[]  @relation("PilotFeedbackConvertedTask")
+  pilotBugReports  PilotBugReport[] @relation("PilotBugConvertedTask")
+}
+
+model TaskAssistant {
+  id     String @id @default(cuid())
+  taskId String
+  userId String
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([taskId, userId])
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  taskId    String
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+
+  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id])
+}
+
+model IssueReport {
+  id                   String        @id @default(cuid())
+  storeId              String?
+  reporterId           String
+  type                 IssueType
+  description          String
+  occurredAt           DateTime
+  severity             IssueSeverity @default(MEDIUM)
+  assignedDepartmentId String?
+  assigneeId           String?
+  status               IssueStatus   @default(OPEN)
+  closureNote          String?
+  sourceType           String?
+  sourceId             String?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  store              Store?         @relation(fields: [storeId], references: [id])
+  reporter           User           @relation("IssueReporter", fields: [reporterId], references: [id])
+  assignedDepartment Department?    @relation("IssueTargetDepartment", fields: [assignedDepartmentId], references: [id])
+  assignee           User?          @relation("IssueAssignee", fields: [assigneeId], references: [id])
+  attachments        Attachment[]
+  logs               IssueLog[]
+  voiceConversions   VoiceMessage[] @relation("VoiceConvertedIssue")
+}
+
+model IssueLog {
+  id            String       @id @default(cuid())
+  issueReportId String
+  actorId       String
+  fromStatus    IssueStatus?
+  toStatus      IssueStatus?
+  comment       String?
+  createdAt     DateTime     @default(now())
+
+  issueReport IssueReport @relation(fields: [issueReportId], references: [id], onDelete: Cascade)
+  actor       User        @relation("IssueLogActor", fields: [actorId], references: [id])
+}
+
+model AuditForm {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy User?         @relation("AuditFormCreator", fields: [createdById], references: [id])
+  items     AuditItem[]
+  records   AuditRecord[]
+}
+
+model AuditItem {
+  id          String   @id @default(cuid())
+  auditFormId String
+  label       String
+  maxScore    Int      @default(5)
+  sortOrder   Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  auditForm AuditForm @relation(fields: [auditFormId], references: [id], onDelete: Cascade)
+}
+
+model AuditRecord {
+  id                 String            @id @default(cuid())
+  auditFormId        String
+  storeId            String?
+  inspectorId        String
+  status             AuditRecordStatus @default(DRAFT)
+  totalScore         Int               @default(0)
+  notes              String?
+  improvementDueDate DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  auditForm   AuditForm         @relation(fields: [auditFormId], references: [id])
+  store       Store?            @relation(fields: [storeId], references: [id])
+  inspector   User              @relation("AuditInspector", fields: [inspectorId], references: [id])
+  details     AuditRecordItem[]
+  attachments Attachment[]
+}
+
+model AuditRecordItem {
+  id            String   @id @default(cuid())
+  auditRecordId String
+  auditItemId   String?
+  label         String
+  score         Int
+  notes         String?
+  photoUrl      String?
+  createdAt     DateTime @default(now())
+
+  auditRecord AuditRecord @relation(fields: [auditRecordId], references: [id], onDelete: Cascade)
+}
+
+model InventoryRequest {
+  id             String                @id @default(cuid())
+  storeId        String?
+  applicantId    String
+  itemName       String
+  quantity       Int
+  purpose        String
+  urgency        InventoryUrgency      @default(NORMAL)
+  reviewStatus   InventoryReviewStatus @default(PENDING)
+  shipmentStatus ShipmentStatus        @default(NOT_SHIPPED)
+  receivedAt     DateTime?
+  notes          String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  store       Store?       @relation(fields: [storeId], references: [id])
+  applicant   User         @relation("InventoryApplicant", fields: [applicantId], references: [id])
+  attachments Attachment[]
+}
+
+model Attachment {
+  id                 String   @id @default(cuid())
+  fileName           String
+  fileUrl            String
+  mimeType           String?
+  size               Int?
+  uploaderId         String
+  approvalRequestId  String?
+  announcementId     String?
+  taskId             String?
+  issueReportId      String?
+  auditRecordId      String?
+  inventoryRequestId String?
+  serviceRequestId   String?
+  createdAt          DateTime @default(now())
+
+  uploader         User              @relation("AttachmentUploader", fields: [uploaderId], references: [id])
+  approvalRequest  ApprovalRequest?  @relation(fields: [approvalRequestId], references: [id], onDelete: Cascade)
+  announcement     Announcement?     @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  task             Task?             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  issueReport      IssueReport?      @relation(fields: [issueReportId], references: [id], onDelete: Cascade)
+  auditRecord      AuditRecord?      @relation(fields: [auditRecordId], references: [id], onDelete: Cascade)
+  inventoryRequest InventoryRequest? @relation(fields: [inventoryRequestId], references: [id], onDelete: Cascade)
+  serviceRequest   ServiceRequest?   @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id              String               @id @default(cuid())
+  userId          String
+  title           String
+  body            String
+  type            String
+  priority        NotificationPriority @default(MEDIUM)
+  status          NotificationStatus   @default(CREATED)
+  color           String?
+  icon            String?
+  targetUrl       String
+  sourceType      String?
+  sourceId        String?
+  isRead          Boolean              @default(false)
+  readAt          DateTime?
+  clickedAt       DateTime?
+  sentAt          DateTime?
+  deliveredAt     DateTime?
+  failedAt        DateTime?
+  dedupeKey       String
+  escalationLevel Int                  @default(0)
+  createdAt       DateTime             @default(now())
+
+  user        User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs        NotificationLog[]
+  escalations NotificationEscalation[]
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, isRead, createdAt])
+  @@index([priority, createdAt])
+}
+
+model PushSubscription {
+  id            String    @id @default(cuid())
+  userId        String
+  endpoint      String    @unique
+  p256dh        String
+  auth          String
+  userAgent     String?
+  deviceType    String?
+  browser       String?
+  os            String?
+  isActive      Boolean   @default(true)
+  lastSuccessAt DateTime?
+  lastFailedAt  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+}
+
+model NotificationPreference {
+  id                      String   @id @default(cuid())
+  userId                  String   @unique
+  notifyNewTask           Boolean  @default(true)
+  notifyDueSoon           Boolean  @default(true)
+  notifyOverdue           Boolean  @default(true)
+  notifyApproval          Boolean  @default(true)
+  notifyRejected          Boolean  @default(true)
+  notifyAnnouncements     Boolean  @default(true)
+  notifyComments          Boolean  @default(true)
+  notifyInventory         Boolean  @default(true)
+  notifyCourses           Boolean  @default(true)
+  enablePush              Boolean  @default(false)
+  enableInApp             Boolean  @default(true)
+  enableBadge             Boolean  @default(true)
+  notifyP0                Boolean  @default(true)
+  notifyP1                Boolean  @default(true)
+  notifyP2                Boolean  @default(true)
+  notifyP3                Boolean  @default(false)
+  quietHoursStart         String?
+  quietHoursEnd           String?
+  allowEscalationOverride Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NotificationLog {
+  id              String                     @id @default(cuid())
+  notificationId  String
+  userId          String
+  channel         NotificationChannel
+  status          NotificationDeliveryStatus @default(PENDING)
+  errorMessage    String?
+  sentAt          DateTime?
+  responsePayload String?
+  createdAt       DateTime                   @default(now())
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, channel, status])
+}
+
+model NotificationEscalation {
+  id               String   @id @default(cuid())
+  notificationId   String
+  fromUserId       String?
+  toUserId         String
+  escalationReason String
+  escalatedAt      DateTime @default(now())
+  status           String   @default("created")
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  fromUser     User?        @relation("NotificationEscalationFrom", fields: [fromUserId], references: [id])
+  toUser       User         @relation("NotificationEscalationTo", fields: [toUserId], references: [id])
+}
+
+model ServiceRequest {
+  id                      String               @id @default(cuid())
+  requestNo               String               @unique
+  title                   String
+  category                String
+  serviceName             String
+  requesterId             String
+  requesterDepartmentId   String?
+  businessUnitId          String?
+  responsibleDepartmentId String?
+  storeId                 String?
+  ownerId                 String?
+  dueDate                 DateTime?
+  priority                TaskPriority         @default(MEDIUM)
+  content                 String
+  status                  ServiceRequestStatus @default(SUBMITTED)
+  sourceType              String?
+  sourceId                String?
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+
+  requester             User                       @relation("ServiceRequestRequester", fields: [requesterId], references: [id])
+  requesterDepartment   Department?                @relation("ServiceRequestRequesterDepartment", fields: [requesterDepartmentId], references: [id])
+  businessUnit          BusinessUnit?              @relation(fields: [businessUnitId], references: [id])
+  responsibleDepartment Department?                @relation("ServiceRequestResponsibleDepartment", fields: [responsibleDepartmentId], references: [id])
+  store                 Store?                     @relation(fields: [storeId], references: [id])
+  owner                 User?                      @relation("ServiceRequestOwner", fields: [ownerId], references: [id])
+  collaborators         ServiceRequestDepartment[]
+  assistants            ServiceRequestAssistant[]
+  logs                  ServiceRequestLog[]
+  attachments           Attachment[]
+  voiceConversions      VoiceMessage[]             @relation("VoiceConvertedServiceRequest")
+}
+
+model ServiceRequestDepartment {
+  id               String @id @default(cuid())
+  serviceRequestId String
+  departmentId     String
+
+  serviceRequest ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+  department     Department     @relation(fields: [departmentId], references: [id])
+
+  @@unique([serviceRequestId, departmentId])
+}
+
+model ServiceRequestAssistant {
+  id               String @id @default(cuid())
+  serviceRequestId String
+  userId           String
+
+  serviceRequest ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id])
+
+  @@unique([serviceRequestId, userId])
+}
+
+model ServiceRequestLog {
+  id               String   @id @default(cuid())
+  serviceRequestId String
+  actorId          String
+  action           String
+  comment          String?
+  createdAt        DateTime @default(now())
+
+  serviceRequest ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+  actor          User           @relation(fields: [actorId], references: [id])
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  actorId      String?
+  action       String
+  resourceType String
+  resourceId   String?
+  metadata     String?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([resourceType, resourceId])
+  @@index([actorId, createdAt])
+}
+
+model ChatConversation {
+  id           String               @id @default(cuid())
+  type         ChatConversationType
+  title        String?
+  sourceType   String?
+  sourceId     String?
+  departmentId String?
+  storeId      String?
+  createdById  String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  department Department?              @relation(fields: [departmentId], references: [id])
+  store      Store?                   @relation(fields: [storeId], references: [id])
+  createdBy  User?                    @relation("ChatConversationCreator", fields: [createdById], references: [id])
+  members    ChatConversationMember[]
+  messages   ChatMessage[]
+  voices     VoiceMessage[]
+
+  @@unique([type, sourceType, sourceId])
+  @@index([sourceType, sourceId])
+}
+
+model ChatConversationMember {
+  id             String    @id @default(cuid())
+  conversationId String
+  userId         String
+  role           String?
+  lastReadAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model ChatMessage {
+  id             String          @id @default(cuid())
+  conversationId String
+  senderId       String
+  messageType    ChatMessageType @default(TEXT)
+  content        String?
+  sourceType     String?
+  sourceId       String?
+  isPinned       Boolean         @default(false)
+  isDeleted      Boolean         @default(false)
+  deletedAt      DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User             @relation(fields: [senderId], references: [id])
+  voice        VoiceMessage?
+
+  @@index([conversationId, createdAt])
+  @@index([sourceType, sourceId])
+}
+
+model VoiceMessage {
+  id                        String              @id @default(cuid())
+  messageId                 String              @unique
+  conversationId            String
+  senderId                  String
+  fileUrl                   String
+  storedFileName            String
+  fileName                  String
+  mimeType                  String
+  fileSize                  Int
+  durationSeconds           Int
+  waveformPeaks             Json?
+  transcriptionText         String?
+  transcriptionStatus       TranscriptionStatus @default(NONE)
+  manualSummary             String?
+  sourceType                String?
+  sourceId                  String?
+  isWithdrawn               Boolean             @default(false)
+  convertedTaskId           String?
+  convertedIssueId          String?
+  convertedServiceRequestId String?
+  attachedApprovalId        String?
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+
+  message                 ChatMessage          @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  conversation            ChatConversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender                  User                 @relation(fields: [senderId], references: [id])
+  convertedTask           Task?                @relation("VoiceConvertedTask", fields: [convertedTaskId], references: [id])
+  convertedIssue          IssueReport?         @relation("VoiceConvertedIssue", fields: [convertedIssueId], references: [id])
+  convertedServiceRequest ServiceRequest?      @relation("VoiceConvertedServiceRequest", fields: [convertedServiceRequestId], references: [id])
+  attachedApproval        ApprovalRequest?     @relation("VoiceAttachedApproval", fields: [attachedApprovalId], references: [id])
+  listens                 VoiceMessageListen[]
+
+  @@index([conversationId, createdAt])
+  @@index([sourceType, sourceId])
+}
+
+model VoiceMessageListen {
+  id                  String    @id @default(cuid())
+  voiceMessageId      String
+  userId              String
+  startedAt           DateTime  @default(now())
+  completedAt         DateTime?
+  lastPositionSeconds Int       @default(0)
+  updatedAt           DateTime  @updatedAt
+
+  voiceMessage VoiceMessage @relation(fields: [voiceMessageId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([voiceMessageId, userId])
+  @@index([userId, completedAt])
+}
+
+model PilotChecklistItem {
+  id          String    @id @default(cuid())
+  userId      String
+  itemKey     String
+  label       String
+  category    String
+  roleKey     RoleKey?
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemKey])
+  @@index([userId, isCompleted])
+}
+
+model PilotFeedback {
+  id                String          @id @default(cuid())
+  testerId          String
+  roleName          String
+  departmentOrStore String?
+  testedAt          DateTime        @default(now())
+  deviceType        PilotDeviceType
+  easeScore         Int
+  homeScore         Int
+  taskScore         Int
+  notificationScore Int
+  voiceScore        Int
+  approvalScore     Int
+  stuckPoint        String?
+  missingButton     String?
+  smallText         String?
+  badFlow           String?
+  receivedPush      Boolean         @default(false)
+  recordedVoice     Boolean         @default(false)
+  playedVoice       Boolean         @default(false)
+  hadError          Boolean         @default(false)
+  suggestions       String?
+  priority          PilotSeverity   @default(P2)
+  status            PilotStatus     @default(OPEN)
+  convertedTaskId   String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  tester        User  @relation("PilotFeedbackTester", fields: [testerId], references: [id], onDelete: Cascade)
+  convertedTask Task? @relation("PilotFeedbackConvertedTask", fields: [convertedTaskId], references: [id])
+
+  @@index([testerId, createdAt])
+  @@index([status, priority])
+}
+
+model PilotBugReport {
+  id                String        @id @default(cuid())
+  reporterId        String
+  title             String
+  type              PilotBugType
+  pageUrl           String?
+  roleName          String
+  deviceType        String
+  description       String
+  screenshotFileUrl String?
+  severity          PilotSeverity
+  blocksTesting     Boolean       @default(false)
+  status            PilotStatus   @default(OPEN)
+  convertedTaskId   String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  reporter      User  @relation("PilotBugReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  convertedTask Task? @relation("PilotBugConvertedTask", fields: [convertedTaskId], references: [id])
+
+  @@index([reporterId, createdAt])
+  @@index([severity, status])
+}
+
+model ErrorReport {
+  id                   String            @id @default(cuid())
+  severity             ErrorSeverity     @default(P2)
+  status               ErrorReportStatus @default(OPEN)
+  title                String
+  message              String
+  module               String?
+  route                String?
+  action               String?
+  userId               String?
+  userRole             String?
+  departmentId         String?
+  branchId             String?
+  businessUnitId       String?
+  deviceType           String?
+  browser              String?
+  os                   String?
+  userAgent            String?
+  appVersion           String?
+  commitHash           String?
+  requestId            String?
+  sessionId            String?
+  stackTraceSanitized  String?
+  breadcrumbsJson      String?
+  contextJsonSanitized String?
+  fingerprint          String            @unique
+  occurrenceCount      Int               @default(1)
+  firstSeenAt          DateTime          @default(now())
+  lastSeenAt           DateTime          @default(now())
+  isResolved           Boolean           @default(false)
+  resolvedAt           DateTime?
+  resolvedByUserId     String?
+  codexFixRequestId    String?
+  githubIssueUrl       String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  user             User?             @relation("ErrorReportUser", fields: [userId], references: [id], onDelete: SetNull)
+  resolvedBy       User?             @relation("ErrorReportResolver", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+  breadcrumbs      ErrorBreadcrumb[]
+  codexFixRequests CodexFixRequest[]
+  attachments      ErrorAttachment[]
+
+  @@index([severity, status, lastSeenAt])
+  @@index([route, module])
+  @@index([userId, lastSeenAt])
+}
+
+model ErrorBreadcrumb {
+  id                    String   @id @default(cuid())
+  errorReportId         String
+  timestamp             DateTime @default(now())
+  type                  String
+  label                 String
+  route                 String?
+  metadataJsonSanitized String?
+
+  errorReport ErrorReport @relation(fields: [errorReportId], references: [id], onDelete: Cascade)
+
+  @@index([errorReportId, timestamp])
+}
+
+model CodexFixRequest {
+  id                   String                @id @default(cuid())
+  errorReportId        String                @unique
+  severity             ErrorSeverity
+  title                String
+  codexPrompt          String
+  sanitizedContextJson String?
+  suspectedFilesJson   String?
+  reproductionSteps    String?
+  acceptanceCriteria   String?
+  status               CodexFixRequestStatus @default(READY)
+  createdByUserId      String?
+  sentToCodexAt        DateTime?
+  githubIssueUrl       String?
+  githubIssueNumber    Int?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  errorReport ErrorReport @relation(fields: [errorReportId], references: [id], onDelete: Cascade)
+  createdBy   User?       @relation("CodexFixRequestCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([severity, status, createdAt])
+}
+
+model ErrorAttachment {
+  id            String   @id @default(cuid())
+  errorReportId String
+  fileUrl       String
+  fileName      String
+  mimeType      String?
+  fileSize      Int?
+  isScreenshot  Boolean  @default(false)
+  isSanitized   Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  errorReport ErrorReport @relation(fields: [errorReportId], references: [id], onDelete: Cascade)
+
+  @@index([errorReportId])
+}
+
+model IdempotencyKey {
+  id          String   @id @default(cuid())
+  userId      String
+  key         String
+  action      String
+  requestHash String?
+  responseUrl String?
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, key, action])
+  @@index([createdAt])
+}

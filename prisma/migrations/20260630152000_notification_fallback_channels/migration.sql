@@ -1,0 +1,2 @@
+ALTER TYPE "NotificationChannel" ADD VALUE IF NOT EXISTS 'EMAIL';
+ALTER TYPE "NotificationChannel" ADD VALUE IF NOT EXISTS 'LINE';

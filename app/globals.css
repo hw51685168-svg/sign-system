@@ -1,0 +1,83 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  button,
+  [role="button"],
+  a[href],
+  input[type="submit"],
+  input[type="button"] {
+    @apply transition duration-150 ease-out;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  input[type="submit"]:not(:disabled),
+  input[type="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:not(:disabled):active,
+  [role="button"]:not([aria-disabled="true"]):active,
+  a[href]:active,
+  input[type="submit"]:not(:disabled):active,
+  input[type="button"]:not(:disabled):active {
+    transform: translateY(1px) scale(0.98);
+    filter: brightness(0.97);
+  }
+
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  a[href]:focus-visible,
+  input[type="submit"]:focus-visible,
+  input[type="button"]:focus-visible {
+    @apply outline-none ring-4 ring-emerald-200 ring-offset-2;
+  }
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: #f6f8f7;
+  color: #18251f;
+  font-size: 18px;
+  line-height: 1.7;
+}
+
+input,
+select,
+textarea {
+  @apply min-h-14 rounded-md border border-slate-300 bg-white px-4 py-3 text-lg font-semibold outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100;
+}
+
+label {
+  @apply text-lg font-black text-slate-800;
+}
+
+textarea {
+  min-height: 150px;
+}
+
+html.large-text body {
+  font-size: 20px;
+}
+
+html.high-contrast body {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+html.high-contrast .text-slate-500,
+html.high-contrast .text-slate-600 {
+  color: #334155 !important;
+}
+
+@media (max-width: 768px) {
+  body {
+    font-size: 18px;
+  }
+}

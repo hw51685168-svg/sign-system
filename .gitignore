@@ -1,0 +1,17 @@
+.env
+.env.local
+.duckdns-token
+.next
+node_modules
+tsconfig.tsbuildinfo
+public/uploads/*
+!public/uploads/.gitkeep
+*.log
+*.err.log
+*帳號*密碼*.txt
+*測試帳號*.txt
+*系統網址*.txt
+*網址*.txt
+outputs/
+CODEX_INBOX/*
+!CODEX_INBOX/.gitkeep
