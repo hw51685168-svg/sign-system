@@ -108,7 +108,7 @@ export default async function AdminPilotPage() {
         <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-2xl font-black text-slate-950">主管測試帳號卡片</h2>
-            <p className="text-base text-slate-700">密碼請使用目前共用測試密碼。測試網址會指向固定網址。</p>
+            <p className="text-base text-slate-700">登入資訊請向系統管理員索取。測試網址會指向固定網址。</p>
           </div>
           <p className="rounded-md bg-slate-100 px-3 py-2 font-mono text-sm text-slate-700">commit: {commitHash}</p>
         </div>

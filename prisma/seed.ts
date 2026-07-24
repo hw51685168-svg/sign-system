@@ -1,8 +1,14 @@
-import { PrismaClient, RoleKey, ScopeLevel } from "@prisma/client";
+﻿import { PrismaClient, RoleKey, ScopeLevel } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
-const sharedPassword = "aaaa8888";
+function requiredSeedPassword() {
+  const password = process.env.SEED_INITIAL_PASSWORD || process.env.TEST_ACCOUNT_PASSWORD;
+  if (!password) throw new Error("SEED_INITIAL_PASSWORD or TEST_ACCOUNT_PASSWORD is required for seeding test users.");
+  return password;
+}
+
+const sharedPassword = requiredSeedPassword();
 
 const text = {
   generalManager: "\u7e3d\u7d93\u7406",
@@ -15,9 +21,10 @@ const text = {
   constructionManager: "\u5efa\u8a2d\u4e3b\u7ba1",
   branchManager: "\u9928\u5225\u4e3b\u7ba1",
   manager: "\u4e3b\u7ba1",
-  staff: "\u90e8\u9580\u4eba\u54e1",
-  storeStaff: "\u9580\u5e02\u4eba\u54e1",
-  systemAdmin: "\u7cfb\u7d71\u7ba1\u7406\u54e1",
+ staff: "\u90e8\u9580\u4eba\u54e1",
+ storeStaff: "\u9580\u5e02\u4eba\u54e1",
+  storeRequester: "\u9580\u5e02\u7533\u8acb\u8207\u6e9d\u901a",
+ systemAdmin: "\u7cfb\u7d71\u7ba1\u7406\u54e1",
   tester: "\u6e2c\u8a66\u4eba\u54e1",
   systemAdminAccount: "\u7cfb\u7d71\u7ba1\u7406\u54e1\u6e2c\u8a66\u5e33\u865f",
   hqUnit: "\u7687\u4eab\u4f01\u696d\u7e3d\u516c\u53f8",
@@ -59,9 +66,10 @@ const roleDefinitions: Array<{
   { key: "CONSTRUCTION_MANAGER", name: text.constructionManager, description: "Construction and improvement task manager.", scope: "DEPARTMENT", permissions: ["tasks:manage", "services:manage"] },
   { key: "BRANCH_MANAGER", name: text.branchManager, description: "Branch-scoped manager.", scope: "BRANCH", permissions: ["tasks:manage", "issues:manage"] },
   { key: "MANAGER", name: text.manager, description: "Department manager.", scope: "DEPARTMENT", permissions: ["approvals:review", "tasks:manage"] },
-  { key: "STAFF", name: text.staff, description: "Department staff.", scope: "SELF", permissions: ["approvals:create", "tasks:report"] },
-  { key: "STORE_STAFF", name: text.storeStaff, description: "Store staff.", scope: "BRANCH", permissions: ["issues:create", "inventory:create"] },
-  { key: "SYSTEM_ADMIN", name: text.systemAdmin, description: "System administrator.", scope: "GLOBAL", permissions: ["*"] },
+ { key: "STAFF", name: text.staff, description: "Department staff.", scope: "SELF", permissions: ["approvals:create", "tasks:report"] },
+ { key: "STORE_STAFF", name: text.storeStaff, description: "Store staff.", scope: "BRANCH", permissions: ["issues:create", "inventory:create"] },
+  { key: "STORE_REQUESTER", name: text.storeRequester, description: "Store-scoped approval requester and task communication participant.", scope: "BRANCH", permissions: ["approval.view", "approval.create", "task.view", "notification.view"] },
+ { key: "SYSTEM_ADMIN", name: text.systemAdmin, description: "System administrator.", scope: "GLOBAL", permissions: ["*"] },
   { key: "TESTER", name: text.tester, description: "Pilot tester.", scope: "SELF", permissions: ["pilot:test"] }
 ];
 
@@ -106,7 +114,6 @@ async function main() {
     update: {},
     create: { name: text.hqUnit, description: "Internal company management unit." }
   });
-
   const departmentNames = [
     text.gmOffice,
     text.hq,

@@ -5,7 +5,12 @@ import { roleLabels } from "@/lib/labels";
 import { canAccessPilot } from "@/lib/pilot";
 import { requireUser } from "@/lib/session";
 
-export default async function PilotBugReportPage({ searchParams }: { searchParams?: { submitted?: string } }) {
+export default async function PilotBugReportPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ submitted?: string }>;
+}) {
+  const parsedSearchParams = (await searchParams) ?? {};
   const user = await requireUser();
   if (!canAccessPilot(user)) {
     redirect("/dashboard");
@@ -18,7 +23,7 @@ export default async function PilotBugReportPage({ searchParams }: { searchParam
         title="測試問題回報"
         description="遇到任何卡住、按鈕不能點、權限不對、手機推播或語音問題，請在這裡回報。P0 會直接通知 system_admin（系統管理員）。"
       />
-      {searchParams?.submitted ? (
+      {parsedSearchParams.submitted ? (
         <Panel className="mb-5 border-emerald-200 bg-emerald-50">
           <p className="font-bold text-emerald-800">已送出測試問題回報。若為 P0，系統已嘗試發送 PWA Push（手機推播）給系統管理員。</p>
         </Panel>

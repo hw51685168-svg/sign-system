@@ -1,9 +1,13 @@
 import { Plus, Search } from "lucide-react";
 import { EmptyState, LinkButton, PageHeader, Panel, StatusBadge, statusTone } from "@/components/ui";
 import { formatDate, formatDateTime, safeText, taskPriorityLabels, taskStatusLabels } from "@/lib/labels";
+import { parseUnitValue, visibleUnitOptions } from "@/lib/org-options";
 import { prisma } from "@/lib/prisma";
 import { canAssignTasks, canViewAllBusinessData, dataScope, scopedTaskWhere } from "@/lib/rbac";
 import { requireUser } from "@/lib/session";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const statusFilterMap: Record<string, string[]> = {
   today: [],
@@ -19,17 +23,19 @@ const statusFilterMap: Record<string, string[]> = {
 export default async function TasksPage({
   searchParams
 }: {
-  searchParams: { q?: string; status?: string; departmentId?: string; ownerId?: string; priority?: string; sort?: string };
+  searchParams?: Promise<{ q?: string; status?: string; departmentId?: string; unitId?: string; ownerId?: string; priority?: string; sort?: string }>;
 }) {
+  const parsedSearchParams = (await searchParams) ?? {};
   const user = await requireUser();
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date();
   todayEnd.setHours(23, 59, 59, 999);
-  const status = searchParams.status ?? "";
-  const q = searchParams.q?.trim();
+  const status = parsedSearchParams.status ?? "";
+  const q = parsedSearchParams.q?.trim();
   const canSeeAll = canViewAllBusinessData(user);
   const scope = dataScope(user);
+  const unitFilter = parseUnitValue(parsedSearchParams.unitId);
 
   const tasks = await prisma.task.findMany({
     where: {
@@ -38,9 +44,10 @@ export default async function TasksPage({
         q ? { OR: [{ title: { contains: q, mode: "insensitive" } }, { content: { contains: q, mode: "insensitive" } }] } : {},
         status === "today" ? { dueDate: { gte: todayStart, lte: todayEnd }, status: { notIn: ["COMPLETED", "CANCELLED"] } } : {},
         status && status !== "today" && statusFilterMap[status] ? { status: { in: statusFilterMap[status] as any } } : {},
-        searchParams.departmentId ? { departmentId: searchParams.departmentId } : {},
-        searchParams.ownerId ? { ownerId: searchParams.ownerId } : {},
-        searchParams.priority ? { priority: searchParams.priority as any } : {}
+        !status ? { status: { not: "CANCELLED" } } : {},
+        unitFilter ? (unitFilter.type === "department" ? { departmentId: unitFilter.id } : { storeId: unitFilter.id }) : parsedSearchParams.departmentId ? { departmentId: parsedSearchParams.departmentId } : {},
+        parsedSearchParams.ownerId ? { ownerId: parsedSearchParams.ownerId } : {},
+        parsedSearchParams.priority ? { priority: parsedSearchParams.priority as any } : {}
       ]
     },
     include: {
@@ -51,12 +58,16 @@ export default async function TasksPage({
       comments: true,
       attachments: true
     },
-    orderBy: searchParams.sort === "updated" ? [{ updatedAt: "desc" }] : [{ dueDate: "asc" }, { updatedAt: "desc" }]
+    orderBy: parsedSearchParams.sort === "updated" ? [{ updatedAt: "desc" }] : [{ dueDate: "asc" }, { updatedAt: "desc" }]
   });
 
-  const [departments, owners] = await Promise.all([
+  const [departments, stores, owners] = await Promise.all([
     prisma.department.findMany({
       where: canSeeAll ? {} : user.departmentId ? { id: user.departmentId } : { id: "__NO_DEPARTMENT__" },
+      orderBy: { name: "asc" }
+    }),
+    prisma.store.findMany({
+      where: canSeeAll ? { isActive: true } : user.storeId ? { id: user.storeId, isActive: true } : { id: "__NO_STORE__" },
       orderBy: { name: "asc" }
     }),
     prisma.user.findMany({
@@ -68,12 +79,13 @@ export default async function TasksPage({
       orderBy: { name: "asc" }
     })
   ]);
+  const unitOptions = visibleUnitOptions(departments, stores);
 
   return (
     <>
       <PageHeader
         title="任務中心"
-        description="列表只顯示摘要。點進任務詳情後再更新狀態、進度、回報與附件。"
+        description="列表只顯示摘要。點進任務詳情後再更新狀態、回報內容與附件。"
         actions={canAssignTasks(user) ? <LinkButton href="/tasks/new"><Plus className="h-5 w-5" />新增任務</LinkButton> : null}
       />
 
@@ -93,19 +105,19 @@ export default async function TasksPage({
             <option value="rejected">駁回修改</option>
             <option value="overdue">已逾期</option>
           </select>
-          <select name="departmentId" defaultValue={searchParams.departmentId ?? ""}>
-            <option value="">全部部門</option>
-            {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
+          <select name="unitId" defaultValue={parsedSearchParams.unitId ?? ""}>
+            <option value="">全部單位</option>
+            {unitOptions.map((unit) => <option key={unit.value} value={unit.value}>{unit.name}</option>)}
           </select>
-          <select name="ownerId" defaultValue={searchParams.ownerId ?? ""}>
-            <option value="">全部負責人</option>
+          <select name="ownerId" defaultValue={parsedSearchParams.ownerId ?? ""}>
+            <option value="">全部接收人</option>
             {owners.map((owner) => <option key={owner.id} value={owner.id}>{owner.name}</option>)}
           </select>
-          <select name="priority" defaultValue={searchParams.priority ?? ""}>
+          <select name="priority" defaultValue={parsedSearchParams.priority ?? ""}>
             <option value="">全部優先級</option>
             {Object.entries(taskPriorityLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
           </select>
-          <select name="sort" defaultValue={searchParams.sort ?? ""}>
+          <select name="sort" defaultValue={parsedSearchParams.sort ?? ""}>
             <option value="">依期限排序</option>
             <option value="updated">依更新時間</option>
           </select>
@@ -124,8 +136,8 @@ export default async function TasksPage({
                   <h2 className="text-2xl font-black text-slate-950">{safeText(task.title, "未命名任務")}</h2>
                   <p className="mt-2 line-clamp-2 text-base leading-7 text-slate-700">{safeText(task.content, "尚無內容")}</p>
                   <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-base text-slate-700">
-                    <span>負責人：<strong>{safeText(task.owner.name, "未指定")}</strong></span>
-                    <span>部門：<strong>{safeText(task.department?.name, "未指定")}</strong></span>
+                    <span>接收人：<strong>{safeText(task.owner.name, "未指定")}</strong></span>
+                    <span>接收部門：<strong>{safeText(task.department?.name, "未指定")}</strong></span>
                     <span>截止：<strong>{formatDate(task.dueDate)}</strong></span>
                     <span>最近更新：<strong>{formatDateTime(task.updatedAt)}</strong></span>
                   </div>
@@ -133,15 +145,6 @@ export default async function TasksPage({
                 <div className="flex shrink-0 flex-wrap gap-2">
                   <StatusBadge label={taskPriorityLabels[task.priority]} />
                   <StatusBadge label={taskStatusLabels[task.status]} tone={statusTone(task.status)} />
-                </div>
-              </div>
-              <div className="mt-4">
-                <div className="mb-2 flex items-center justify-between text-sm font-bold text-slate-700">
-                  <span>進度</span>
-                  <span>{Math.min(Math.max(task.progress, 0), 100)}%</span>
-                </div>
-                <div className="h-3 rounded-full bg-slate-100">
-                  <div className="h-3 rounded-full bg-brand-700" style={{ width: `${Math.min(Math.max(task.progress, 0), 100)}%` }} />
                 </div>
               </div>
               <div className="mt-4 flex flex-wrap gap-3 text-sm font-semibold text-slate-600">

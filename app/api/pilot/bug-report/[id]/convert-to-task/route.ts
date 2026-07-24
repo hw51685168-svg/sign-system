@@ -1,16 +1,17 @@
-import { appRedirect } from "@/lib/redirect";
+﻿import { appRedirect } from "@/lib/redirect";
 import { createNotification } from "@/lib/notifications";
 import { canAccessPilotAdmin } from "@/lib/pilot";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 
-export async function POST(_request: Request, { params }: { params: { id: string } }) {
+export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const user = await requireUser();
   if (!canAccessPilotAdmin(user)) {
     return new Response("你沒有將 Bug 轉成修正任務的權限。", { status: 403 });
   }
 
-  const bug = await prisma.pilotBugReport.findUnique({ where: { id: params.id }, include: { reporter: true } });
+  const bug = await prisma.pilotBugReport.findUnique({ where: { id: id }, include: { reporter: true } });
   if (!bug) return new Response("找不到 Bug 回報。", { status: 404 });
   if (bug.convertedTaskId) return appRedirect(`/tasks/${bug.convertedTaskId}`);
 

@@ -1,15 +1,21 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { optionalTextValue, textValue } from "@/lib/form";
+import { canWriteConversationCommunication } from "@/lib/communication-permissions";
 import { prisma } from "@/lib/prisma";
 import { assertConversationAccess, conversationTargetUrl, maxVoiceBytes, maxVoiceSeconds, notifyVoiceRecipients, saveVoiceFile, writeVoiceAudit } from "@/lib/voice";
 import { requireUser } from "@/lib/session";
 
 export const runtime = "nodejs";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const user = await requireUser();
-  const conversation = await assertConversationAccess(params.id, user);
+  const conversation = await assertConversationAccess(id, user);
   if (!conversation) return NextResponse.json({ error: "沒有此聊天室權限。" }, { status: 403 });
+
+  if (!(await canWriteConversationCommunication(user, conversation))) {
+    return NextResponse.json({ error: "總經理目前僅保留觀看權限，部門對部門案件不開放新增語音。" }, { status: 403 });
+  }
 
   const formData = await request.formData();
   const file = formData.get("voice");

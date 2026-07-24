@@ -1,11 +1,12 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { assertVoiceAccess, conversationTargetUrl, writeVoiceAudit } from "@/lib/voice";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 
-export async function GET(request: Request, { params }: { params: { voiceMessageId: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ voiceMessageId: string }> }) {
+  const { voiceMessageId } = await params;
   const user = await requireUser();
-  const voice = await assertVoiceAccess(params.voiceMessageId, user);
+  const voice = await assertVoiceAccess(voiceMessageId, user);
   if (!voice || voice.isWithdrawn || voice.message.isDeleted) {
     return NextResponse.json({ error: "找不到語音或沒有權限。" }, { status: 404 });
   }
@@ -27,9 +28,10 @@ export async function GET(request: Request, { params }: { params: { voiceMessage
   });
 }
 
-export async function DELETE(request: Request, { params }: { params: { voiceMessageId: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ voiceMessageId: string }> }) {
+  const { voiceMessageId } = await params;
   const user = await requireUser();
-  const voice = await assertVoiceAccess(params.voiceMessageId, user);
+  const voice = await assertVoiceAccess(voiceMessageId, user);
   if (!voice) return NextResponse.json({ error: "找不到語音或沒有權限。" }, { status: 404 });
   if (voice.senderId !== user.id && user.roleKey !== "SYSTEM_ADMIN" && user.roleKey !== "GENERAL_MANAGER") {
     return NextResponse.json({ error: "只有發送者或管理層可以撤回語音。" }, { status: 403 });

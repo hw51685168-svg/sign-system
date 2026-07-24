@@ -14,7 +14,10 @@ export function PwaInstallPrompt() {
 
   useEffect(() => {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then((registration) => registration.update().catch(() => undefined))
+        .catch(() => undefined);
     }
 
     const dismissed = localStorage.getItem("hx-pwa-install-dismissed") === "true";

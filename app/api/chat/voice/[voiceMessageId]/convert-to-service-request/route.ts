@@ -1,4 +1,4 @@
-import { TaskPriority } from "@prisma/client";
+﻿import { TaskPriority } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { optionalTextValue, textValue } from "@/lib/form";
 import { createNotification } from "@/lib/notifications";
@@ -15,9 +15,10 @@ async function nextServiceNo() {
   return `SR-${code}-${String(count + 1).padStart(4, "0")}`;
 }
 
-export async function POST(request: Request, { params }: { params: { voiceMessageId: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ voiceMessageId: string }> }) {
+  const { voiceMessageId } = await params;
   const user = await requireUser();
-  const voice = await assertVoiceAccess(params.voiceMessageId, user);
+  const voice = await assertVoiceAccess(voiceMessageId, user);
   if (!voice) return NextResponse.json({ error: "找不到語音或沒有權限。" }, { status: 404 });
   if (!canConvertVoiceToServiceRequest(user)) return NextResponse.json({ error: "沒有語音轉服務需求權限。" }, { status: 403 });
 

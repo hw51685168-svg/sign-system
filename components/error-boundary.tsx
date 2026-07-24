@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { reportClientError } from "@/components/error-capture-client";
 
 type State = { hasError: boolean; message: string };
@@ -38,9 +39,9 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
               <button className="min-h-11 rounded-md bg-brand-700 px-4 font-bold text-white" onClick={() => window.location.reload()}>
                 重新整理
               </button>
-              <a className="inline-flex min-h-11 items-center rounded-md border border-slate-300 px-4 font-bold text-slate-800" href="/">
+              <Link className="inline-flex min-h-11 items-center rounded-md border border-slate-300 px-4 font-bold text-slate-800" href="/">
                 回首頁
-              </a>
+              </Link>
             </div>
           </section>
         </main>

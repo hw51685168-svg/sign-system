@@ -1,19 +1,34 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Pause, Play, RotateCcw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ExternalLink, Pause, Play, RotateCcw } from "lucide-react";
 
 function formatTime(seconds: number) {
   const safe = Math.max(0, Math.round(seconds || 0));
   return `${Math.floor(safe / 60).toString().padStart(2, "0")}:${(safe % 60).toString().padStart(2, "0")}`;
 }
 
-export function VoicePlayer({ voiceMessageId, streamUrl, durationSeconds }: { voiceMessageId: string; streamUrl: string; durationSeconds: number }) {
+export function VoicePlayer({
+  voiceMessageId,
+  streamUrl,
+  durationSeconds,
+  mimeType
+}: {
+  voiceMessageId: string;
+  streamUrl: string;
+  durationSeconds: number;
+  mimeType?: string | null;
+}) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
   const [speed, setSpeed] = useState(1);
   const [error, setError] = useState("");
+  const [isAppleDevice, setIsAppleDevice] = useState(false);
+
+  useEffect(() => {
+    setIsAppleDevice(/iPad|iPhone|iPod|Macintosh/i.test(navigator.userAgent));
+  }, []);
 
   async function markListen(completed = false) {
     await fetch(`/api/chat/voice/${voiceMessageId}/listen`, {
@@ -34,7 +49,7 @@ export function VoicePlayer({ voiceMessageId, streamUrl, durationSeconds }: { vo
         setPlaying(true);
         void markListen(false);
       } catch {
-        setError("無法播放語音，可能是沒有權限、語音已撤回或網路暫時中斷。");
+        setError("無法播放語音，請確認瀏覽器允許播放音訊。");
       }
     } else {
       audio.pause();
@@ -54,10 +69,12 @@ export function VoicePlayer({ voiceMessageId, streamUrl, durationSeconds }: { vo
     if (!audio) return;
     audio.currentTime = 0;
     setCurrent(0);
-    void audio.play().then(() => {
-      setError("");
-      setPlaying(true);
-    }).catch(() => setError("無法重新播放語音，請重新整理後再試一次。"));
+    void audio.play()
+      .then(() => {
+        setError("");
+        setPlaying(true);
+      })
+      .catch(() => setError("無法重新播放語音，請重新整理後再試。"));
   }
 
   return (
@@ -66,6 +83,8 @@ export function VoicePlayer({ voiceMessageId, streamUrl, durationSeconds }: { vo
         ref={audioRef}
         src={streamUrl}
         preload="metadata"
+        controls
+        className="w-full"
         onTimeUpdate={(event) => setCurrent(event.currentTarget.currentTime)}
         onEnded={() => {
           setPlaying(false);
@@ -74,9 +93,14 @@ export function VoicePlayer({ voiceMessageId, streamUrl, durationSeconds }: { vo
         }}
         onError={() => {
           setPlaying(false);
-          setError("語音載入失敗。若此語音已撤回或你沒有權限，系統會阻擋播放。");
+          setError("語音載入失敗，可能已撤回、沒有播放權限，或目前手機不支援此音訊格式。");
         }}
       />
+      {isAppleDevice && mimeType?.toLowerCase().includes("webm") ? (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-sm font-bold text-amber-800">
+          這則語音是 WebM 格式，部分 iPhone 可能無法播放。若播放失敗，請請對方用 iPhone 重新錄音，或改用電腦播放。
+        </p>
+      ) : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <button className="inline-flex min-h-12 min-w-24 items-center justify-center gap-2 rounded-md bg-brand-700 px-4 text-lg font-black text-white" type="button" onClick={toggle}>
           {playing ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
@@ -98,7 +122,9 @@ export function VoicePlayer({ voiceMessageId, streamUrl, durationSeconds }: { vo
               if (audioRef.current) audioRef.current.playbackRate = next;
             }}
           >
-            {[1, 1.25, 1.5, 2].map((value) => <option key={value} value={value}>{value}x</option>)}
+            {[1, 1.25, 1.5, 2].map((value) => (
+              <option key={value} value={value}>{value}x</option>
+            ))}
           </select>
         </label>
       </div>
@@ -111,7 +137,15 @@ export function VoicePlayer({ voiceMessageId, streamUrl, durationSeconds }: { vo
         value={Math.min(current, Math.max(durationSeconds, current, 1))}
         onChange={(event) => seek(Number(event.target.value))}
       />
-      {error ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm font-bold text-red-700">{error}</p> : null}
+      {error ? (
+        <div className="grid gap-2 rounded-md bg-red-50 px-3 py-2 text-sm font-bold text-red-700">
+          <p>{error}</p>
+          <a className="inline-flex items-center gap-1 underline" href={streamUrl} target="_blank" rel="noreferrer">
+            <ExternalLink className="h-4 w-4" />
+            另開語音檔測試播放
+          </a>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { InventoryUrgency } from "@prisma/client";
 import { PackagePlus } from "lucide-react";
 import { Button, Field, PageHeader, Panel, StatusBadge, statusTone } from "@/components/ui";
 import { formatDateTime, inventoryReviewStatusLabels, inventoryUrgencyLabels, shipmentStatusLabels } from "@/lib/labels";
+import { visibleStoreOptions } from "@/lib/org-options";
 import { prisma } from "@/lib/prisma";
 import { isExecutive } from "@/lib/rbac";
 import { requireUser } from "@/lib/session";
@@ -18,6 +19,7 @@ export default async function InventoryPage() {
         prisma.inventoryRequest.findMany({ where, include: { store: true, applicant: true }, orderBy: { updatedAt: "desc" } }),
         prisma.store.findMany({ where: { isActive: true }, orderBy: { name: "asc" } })
       ]);
+  const storeOptions = visibleStoreOptions(stores);
 
   return (
     <>
@@ -29,16 +31,22 @@ export default async function InventoryPage() {
             <Field label="申請門市">
               <select name="storeId" defaultValue={user.storeId ?? ""}>
                 <option value="">未指定</option>
-                {stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
+                {storeOptions.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
               </select>
             </Field>
-            <Field label="品項名稱"><input name="itemName" required /></Field>
+            <Field label="品項名稱"><input name="itemName" required placeholder="例如：毛巾、精油、包材、門市用品" /></Field>
             <Field label="數量"><input name="quantity" type="number" min="1" required /></Field>
-            <Field label="用途"><textarea name="purpose" required /></Field>
+            <Field label="用途">
+              <textarea
+                name="purpose"
+                required
+                placeholder="請寫清楚申請原因、目前庫存、預計使用時間。例如：好腳舍仁武館毛巾庫存剩 2 天，週末客量較高，需補 50 條。"
+              />
+            </Field>
             <Field label="急迫程度">
               <select name="urgency">{Object.values(InventoryUrgency).map((urgency) => <option key={urgency} value={urgency}>{inventoryUrgencyLabels[urgency]}</option>)}</select>
             </Field>
-            <Field label="備註"><input name="notes" /></Field>
+            <Field label="備註"><input name="notes" placeholder="例如：需急件、可併下次配送、指定送達日期" /></Field>
             <Field label="附件"><input name="attachments" type="file" multiple /></Field>
             <Button type="submit"><PackagePlus className="h-4 w-4" />送出補貨申請</Button>
           </form>

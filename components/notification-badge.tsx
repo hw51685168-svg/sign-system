@@ -29,13 +29,18 @@ export function NotificationBadge({ initialCount, variant = "number" }: Notifica
       }
     }
 
+    function updateFromGlobalEvent(event: Event) {
+      const detail = (event as CustomEvent<{ count?: number }>).detail;
+      if (typeof detail?.count === "number") setCount(detail.count);
+    }
+
     void refresh();
-    const interval = window.setInterval(refresh, 5000);
+    window.addEventListener("ju:notification-count", updateFromGlobalEvent);
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
     return () => {
       alive = false;
-      window.clearInterval(interval);
+      window.removeEventListener("ju:notification-count", updateFromGlobalEvent);
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", refresh);
     };

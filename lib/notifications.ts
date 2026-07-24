@@ -1,5 +1,6 @@
 import { NotificationPriority, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { sendNativePushForNotification } from "@/lib/native-push";
 import { sendPushForNotification } from "@/lib/push";
 
 export const notificationPriorityLabels: Record<NotificationPriority, string> = {
@@ -31,10 +32,46 @@ export type CreateNotificationInput = {
 function queuePush(notificationId: string) {
   if (process.env.DISABLE_AUTO_PUSH === "true") return;
   const delayMs = Number(process.env.PUSH_DISPATCH_DELAY_MS ?? 900);
-  setTimeout(() => {
-    sendPushForNotification(notificationId).catch((error) => {
-      console.error("Auto push failed", error);
-    });
+  setTimeout(async () => {
+    const [webResult, nativeResult] = await Promise.all([
+      sendPushForNotification(notificationId).catch((error) => {
+        console.error("Auto web push failed", error);
+        return { sent: 0, failed: 1, reason: error instanceof Error ? error.message : String(error) };
+      }),
+      sendNativePushForNotification(notificationId).catch((error) => {
+        console.error("Auto native push failed", error);
+        return { sent: 0, failed: 1, skipped: 0, reason: error instanceof Error ? error.message : String(error) };
+      })
+    ]);
+
+    const webSent = Number(webResult.sent ?? 0);
+    const nativeSent = Number(nativeResult.sent ?? 0);
+    const webFailed = Number(webResult.failed ?? 0);
+    const nativeFailed = Number(nativeResult.failed ?? 0);
+    const webSkipped = Number((webResult as { skipped?: number }).skipped ?? 0);
+    const nativeSkipped = Number(nativeResult.skipped ?? 0);
+
+    if (webSent + nativeSent + webFailed + nativeFailed === 0 && webSkipped + nativeSkipped > 0) {
+      const notification = await prisma.notification.findUnique({
+        where: { id: notificationId },
+        select: { userId: true }
+      });
+      if (!notification) return;
+
+      await prisma.notificationLog.create({
+        data: {
+          notificationId,
+          userId: notification.userId,
+          channel: "PUSH",
+          status: "FAILED",
+          errorMessage: "沒有有效背景推播通道。請到設定開啟 PWA Web Push；Android App 關閉或鎖定通知需完成 Firebase FCM 設定並註冊裝置 token。",
+          responsePayload: JSON.stringify({
+            web: webResult.reason ?? "No active Web Push subscription",
+            native: nativeResult.reason ?? "No active Android FCM token"
+          })
+        }
+      });
+    }
   }, Number.isFinite(delayMs) ? delayMs : 900);
 }
 
@@ -75,6 +112,7 @@ export async function createNotification(input: CreateNotificationInput, tx: Pri
       }
     }
   });
+
   queuePush(notification.id);
   return notification;
 }

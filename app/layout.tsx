@@ -10,18 +10,22 @@ const notoSansTc = Noto_Sans_TC({
 });
 
 export const metadata: Metadata = {
-  title: "皇享企業電子簽呈與協作雲端系統",
-  description: "內部簽呈、公告、任務、問題回報與稽核追蹤系統",
-  applicationName: "皇享簽呈",
+  title: "JU數位管理｜內部流程管理與電子簽核",
+  description: "JU數位管理，提供公司內部流程管理、電子簽核、安全追蹤與任務溝通。",
+  applicationName: "JU數位管理",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "皇享簽呈",
+    title: "JU數位管理",
     statusBarStyle: "default"
   },
   icons: {
-    icon: "/app-icon.svg",
-    apple: "/app-icon.svg"
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/app-icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/app-icon-512.png", sizes: "512x512", type: "image/png" }
+    ],
+    apple: "/apple-touch-icon.png"
   }
 };
 

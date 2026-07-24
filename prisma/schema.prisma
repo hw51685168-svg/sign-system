@@ -20,6 +20,7 @@ enum RoleKey {
   MANAGER
   STAFF
   STORE_STAFF
+  STORE_REQUESTER
   SYSTEM_ADMIN
   TESTER
 }
@@ -324,6 +325,7 @@ model User {
   notificationEscalationsFrom NotificationEscalation[]  @relation("NotificationEscalationFrom")
   notificationEscalationsTo   NotificationEscalation[]  @relation("NotificationEscalationTo")
   pushSubscriptions           PushSubscription[]
+  nativeDeviceTokens          NativeDeviceToken[]
   notificationPreferences     NotificationPreference?
   notificationLogs            NotificationLog[]
   chatConversationsCreated    ChatConversation[]        @relation("ChatConversationCreator")
@@ -445,6 +447,7 @@ model ApprovalSignature {
   id                String   @id @default(cuid())
   approvalRequestId String
   signerId          String
+  signaturePurpose  String   @default("APPROVER")
   signatureDataUrl  String
   contentSnapshot   String
   signedAt          DateTime @default(now())
@@ -455,7 +458,7 @@ model ApprovalSignature {
   approvalRequest ApprovalRequest @relation(fields: [approvalRequestId], references: [id], onDelete: Cascade)
   signer          User            @relation(fields: [signerId], references: [id])
 
-  @@unique([approvalRequestId, signerId])
+  @@unique([approvalRequestId, signerId, signaturePurpose])
 }
 
 model ApprovalStep {
@@ -768,10 +771,35 @@ model PushSubscription {
   endpoint      String    @unique
   p256dh        String
   auth          String
+  platform      String?
   userAgent     String?
   deviceType    String?
   browser       String?
   os            String?
+  isActive      Boolean   @default(true)
+  lastSeenAt    DateTime?
+  lastSuccessAt DateTime?
+  lastFailedAt  DateTime?
+  lastFailureReason String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+  @@index([platform, isActive])
+}
+
+model NativeDeviceToken {
+  id            String    @id @default(cuid())
+  userId        String
+  token         String    @unique
+  platform      String
+  provider      String
+  deviceModel   String?
+  osVersion     String?
+  appVersion    String?
+  userAgent     String?
   isActive      Boolean   @default(true)
   lastSuccessAt DateTime?
   lastFailedAt  DateTime?
@@ -781,6 +809,7 @@ model PushSubscription {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isActive])
+  @@index([platform, provider, isActive])
 }
 
 model NotificationPreference {

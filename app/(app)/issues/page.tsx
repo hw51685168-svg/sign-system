@@ -2,6 +2,7 @@ import { IssueSeverity, IssueType } from "@prisma/client";
 import { AlertCircle } from "lucide-react";
 import { Button, Field, PageHeader, Panel, StatusBadge, statusTone } from "@/components/ui";
 import { formatDateTime, issueSeverityLabels, issueStatusLabels, issueTypeLabels } from "@/lib/labels";
+import { visibleDepartmentOptions, visibleStoreOptions } from "@/lib/org-options";
 import { prisma } from "@/lib/prisma";
 import { scopedIssueWhere } from "@/lib/rbac";
 import { requireUser } from "@/lib/session";
@@ -20,6 +21,8 @@ export default async function IssuesPage() {
         prisma.store.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
         prisma.department.findMany({ orderBy: { name: "asc" } })
       ]);
+  const departmentOptions = visibleDepartmentOptions(departments);
+  const storeOptions = visibleStoreOptions(stores);
 
   return (
     <>
@@ -31,21 +34,27 @@ export default async function IssuesPage() {
             <Field label="門市">
               <select name="storeId" defaultValue={user.storeId ?? ""}>
                 <option value="">未指定</option>
-                {stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
+                {storeOptions.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
               </select>
             </Field>
             <Field label="問題類型">
               <select name="type">{Object.values(IssueType).map((type) => <option key={type} value={type}>{issueTypeLabels[type]}</option>)}</select>
             </Field>
-            <Field label="問題描述"><textarea name="description" required /></Field>
+            <Field label="問題描述">
+              <textarea
+                name="description"
+                required
+                placeholder="請寫清楚發生地點、狀況、影響程度與已先做的處理。例如：好腳舍仁武館櫃台電腦登入異常，已重開機仍無法使用，影響現場結帳。"
+              />
+            </Field>
             <Field label="發生時間"><input name="occurredAt" type="datetime-local" required /></Field>
             <Field label="嚴重程度">
               <select name="severity">{Object.values(IssueSeverity).map((severity) => <option key={severity} value={severity}>{issueSeverityLabels[severity]}</option>)}</select>
             </Field>
-            <Field label="指派處理部門">
+            <Field label="交給哪個部門處理">
               <select name="assignedDepartmentId">
                 <option value="">先不指定</option>
-                {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
+                {departmentOptions.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
               </select>
             </Field>
             <Field label="照片或附件"><input name="attachments" type="file" multiple /></Field>
@@ -63,7 +72,7 @@ export default async function IssuesPage() {
                     <p className="font-bold text-slate-950">{issue.store?.name ?? "未指定門市"} · {issueTypeLabels[issue.type as keyof typeof issueTypeLabels]}</p>
                     <p className="mt-1 text-sm text-slate-600">{issue.description}</p>
                     <p className="mt-2 text-xs text-slate-500">
-                      回報人：{issue.reporter.name} · 發生：{formatDateTime(issue.occurredAt)} · 處理部門：{issue.assignedDepartment?.name ?? "-"}
+                      回報人：{issue.reporter.name} · 發生：{formatDateTime(issue.occurredAt)} · 交給：{issue.assignedDepartment?.name ?? "-"}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">

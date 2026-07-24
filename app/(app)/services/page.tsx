@@ -1,6 +1,9 @@
 import { Send, Wrench } from "lucide-react";
+import { AndroidDateInput } from "@/components/android-date-input";
+import { AndroidSelectInput } from "@/components/android-select-input";
 import { Button, Field, PageHeader, Panel, StatusBadge, statusTone } from "@/components/ui";
 import { formatDate, safeText, serviceRequestStatusLabels, taskPriorityLabels } from "@/lib/labels";
+import { visibleDepartmentOptions } from "@/lib/org-options";
 import { prisma } from "@/lib/prisma";
 import { scopedServiceRequestWhere } from "@/lib/rbac";
 import { requireUser } from "@/lib/session";
@@ -28,12 +31,18 @@ export default async function ServicesPage() {
       take: 30
     })
   ]);
+  const departmentOptions = visibleDepartmentOptions(departments);
+  const categoryOptions = serviceCatalog.map(([category]) => ({ value: category, label: category }));
+  const serviceNameOptions = serviceCatalog.flatMap(([category, items]) => items.map((item) => ({ value: item, label: `${category} / ${item}` })));
+  const responsibleDepartmentOptions = departmentOptions.map((department) => ({ value: department.id, label: department.name }));
+  const ownerOptions = [{ value: "", label: "先由承接部門接單" }, ...users.map((item) => ({ value: item.id, label: item.name }))];
+  const priorityOptions = Object.entries(taskPriorityLabels).map(([key, label]) => ({ value: key, label }));
 
   return (
     <>
       <PageHeader
-        title="Service Catalog（部門服務目錄）"
-        description="跨部門需求請從這裡提出，系統會留下負責部門、主責人、期限、留言與歷程紀錄。"
+        title="部門服務需求"
+        description="跨部門需要協助時從這裡提出，系統會留下發起部門、承接部門、承辦人、期限、留言與歷程紀錄。"
       />
 
       <div className="grid gap-6 xl:grid-cols-[440px_1fr]">
@@ -43,37 +52,32 @@ export default async function ServicesPage() {
             建立服務需求
           </h2>
           <form action="/api/services" method="post" encType="multipart/form-data" className="grid gap-4">
-            <Field label="需求標題"><input name="title" required placeholder="例：瑞光館活動海報設計需求" /></Field>
+            <Field label="需求標題"><input name="title" required placeholder="例：好腳舍屏東館活動海報設計需求、EFS屏東館新品拍攝需求" /></Field>
             <Field label="服務分類">
-              <select name="category" required>
-                {serviceCatalog.map(([category]) => <option key={category} value={category}>{category}</option>)}
-              </select>
+              <AndroidSelectInput name="category" options={categoryOptions} required />
             </Field>
             <Field label="服務項目">
-              <select name="serviceName" required>
-                {serviceCatalog.flatMap(([category, items]) => items.map((item) => <option key={`${category}-${item}`} value={item}>{category} / {item}</option>))}
-              </select>
+              <AndroidSelectInput name="serviceName" options={serviceNameOptions} required />
             </Field>
-            <Field label="負責部門">
-              <select name="responsibleDepartmentId" required>
-                {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
-              </select>
+            <Field label="承接部門（需求交給哪個部門）">
+              <AndroidSelectInput name="responsibleDepartmentId" options={responsibleDepartmentOptions} required />
             </Field>
-            <Field label="主責人">
-              <select name="ownerId">
-                <option value="">先由負責部門接單</option>
-                {users.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-              </select>
+            <Field label="承辦人（誰主要處理）">
+              <AndroidSelectInput name="ownerId" options={ownerOptions} />
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="期限"><input name="dueDate" type="date" /></Field>
+              <Field label="期限"><AndroidDateInput name="dueDate" label="請輸入期限" /></Field>
               <Field label="優先級">
-                <select name="priority" defaultValue="MEDIUM">
-                  {Object.entries(taskPriorityLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-                </select>
+                <AndroidSelectInput name="priority" options={priorityOptions} defaultValue="MEDIUM" />
               </Field>
             </div>
-            <Field label="需求內容"><textarea name="content" required placeholder="請說明背景、需要協助的事項、交付標準與注意事項。" /></Field>
+            <Field label="需求內容">
+              <textarea
+                name="content"
+                required
+                placeholder="請寫清楚背景、需要協助的事項、希望交付成果、期限與注意事項。例如：需要美工部門協助製作活動海報，尺寸 A4，文案已附檔，請於週五前提供初稿。"
+              />
+            </Field>
             <Field label="附件"><input name="attachments" type="file" multiple /></Field>
             <Button type="submit"><Send className="h-5 w-5" />送出服務需求</Button>
           </form>
@@ -103,7 +107,7 @@ export default async function ServicesPage() {
                       <p className="font-mono text-sm font-bold text-slate-500">{request.requestNo}</p>
                       <p className="text-xl font-black text-slate-950">{safeText(request.title, "未命名需求")}</p>
                       <p className="mt-1 text-base text-slate-700">
-                        發起：{safeText(request.requesterDepartment?.name, "未指定")} → 負責：{safeText(request.responsibleDepartment?.name, "未指定")} · 主責：{safeText(request.owner?.name, "未指定")}
+                        發起：{safeText(request.requesterDepartment?.name, "未指定")} → 承接：{safeText(request.responsibleDepartment?.name, "未指定")} · 承辦：{safeText(request.owner?.name, "未指定")}
                       </p>
                       <p className="mt-1 text-sm text-slate-600">期限：{formatDate(request.dueDate)}</p>
                     </div>

@@ -1,11 +1,12 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { assertVoiceAccess, writeVoiceAudit } from "@/lib/voice";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 
-export async function POST(request: Request, { params }: { params: { voiceMessageId: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ voiceMessageId: string }> }) {
+  const { voiceMessageId } = await params;
   const user = await requireUser();
-  const voice = await assertVoiceAccess(params.voiceMessageId, user);
+  const voice = await assertVoiceAccess(voiceMessageId, user);
   if (!voice || voice.isWithdrawn || voice.message.isDeleted) {
     return NextResponse.json({ error: "找不到語音或沒有權限。" }, { status: 404 });
   }

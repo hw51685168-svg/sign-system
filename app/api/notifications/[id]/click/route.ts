@@ -1,12 +1,13 @@
-import { appRedirect } from "@/lib/redirect";
+﻿import { appRedirect } from "@/lib/redirect";
 import { markNotificationRead } from "@/lib/notifications";
 import { revalidateNotificationNavigation } from "@/lib/navigation-revalidate";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const user = await requireUser();
-  const notification = await prisma.notification.findFirst({ where: { id: params.id, userId: user.id } });
+  const notification = await prisma.notification.findFirst({ where: { id: id, userId: user.id } });
   if (!notification) return appRedirect("/notifications");
 
   await markNotificationRead(notification.id, user.id);

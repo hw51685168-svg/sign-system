@@ -1,6 +1,7 @@
-import { ApprovalAction, ApprovalStatus } from "@prisma/client";
+﻿import { ApprovalAction, ApprovalStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { optionalTextValue, textValue } from "@/lib/form";
+import { canWriteApprovalCommunication } from "@/lib/communication-permissions";
 import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/notifications";
 import { revalidateApprovalNavigation } from "@/lib/navigation-revalidate";
@@ -33,9 +34,21 @@ function actionFailure(request: Request, approvalId: string, message: string, st
   return appRedirect(approvalRedirectPath(approvalId, "actionError", message));
 }
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+function resultMessage(action: ApprovalAction, toStatus: ApprovalStatus) {
+  if (action === "APPROVE") return toStatus === "APPROVED" ? "已核准簽呈。" : "已核准，簽呈已送往下一關。";
+  if (action === "REJECT") return "已駁回簽呈。";
+  if (action === "REQUEST_REVISION") return "已退回申請人修改。";
+  if (action === "COMMENT") return "留言已送出。";
+  if (action === "ADD_APPROVER") return "已新增簽核人。";
+  if (action === "TRANSFER") return "已轉派簽核。";
+  if (action === "CLOSE") return "已結案。";
+  return "操作完成。";
+}
+
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const user = await requireUser();
-  if (demoMode) return appRedirect(`/approvals/${params.id}`);
+  if (demoMode) return appRedirect(`/approvals/${id}`);
 
   const formData = await request.formData();
   const comment = optionalTextValue(formData, "comment");
@@ -46,21 +59,25 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const userAgent = request.headers.get("user-agent");
 
   if (!Object.values(ApprovalAction).includes(action)) {
-    return actionFailure(request, params.id, "操作動作不正確，請回到簽呈頁重新按一次按鈕。", 400);
+    return actionFailure(request, id, "操作動作不正確，請回到簽呈頁重新按一次按鈕。", 400);
   }
 
   if (action === "COMMENT" && !comment) {
-    return actionFailure(request, params.id, "留言內容不可空白。", 400);
+    return actionFailure(request, id, "留言內容不可空白。", 400);
   }
 
   const approval = await prisma.approvalRequest.findFirst({
-    where: { AND: [{ id: params.id }, scopedApprovalWhere(user)] },
+    where: { AND: [{ id: id }, scopedApprovalWhere(user)] },
     include: { steps: { orderBy: { stepOrder: "asc" } }, signatures: true }
   });
 
   if (!approval) {
-    const exists = await prisma.approvalRequest.count({ where: { id: params.id } });
-    return actionFailure(request, params.id, exists ? "權限不足，無法查看或操作這張簽呈。" : "找不到簽呈。", exists ? 403 : 404);
+    const exists = await prisma.approvalRequest.count({ where: { id: id } });
+    return actionFailure(request, id, exists ? "你沒有權限查看或操作這筆簽呈。" : "找不到這筆簽呈。", exists ? 403 : 404);
+  }
+
+  if (action === "COMMENT" && !canWriteApprovalCommunication(user, approval)) {
+    return actionFailure(request, approval.id, "總經理目前僅保留觀看權限，部門對部門簽呈不開放留言介入。", 403);
   }
 
   const incompleteStep = approval.steps.find((step) => !step.isCompleted);
@@ -68,15 +85,19 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   if (action !== "COMMENT") {
     if (!incompleteStep) {
-      return actionFailure(request, approval.id, "此簽呈目前沒有待簽核關卡。", 409);
+      return actionFailure(request, approval.id, "這筆簽呈已沒有待處理關卡。", 409);
+    }
+
+    if (approval.applicantId === user.id) {
+      return actionFailure(request, approval.id, "申請人不能核准、駁回或退回自己的簽呈，請交由指定簽核人處理。", 403);
     }
 
     if (!isCurrentApprover) {
-      return actionFailure(request, approval.id, "你不是目前關卡的簽核人，無法操作這張簽呈。", 403);
+      return actionFailure(request, approval.id, "你不是目前關卡的簽核人，不能操作這筆簽呈。", 403);
     }
 
     if (["APPROVED", "REJECTED", "CLOSED", "NEEDS_REVISION"].includes(approval.status)) {
-      return actionFailure(request, approval.id, "此簽呈目前不可簽核，請重新整理查看最新狀態。", 409);
+      return actionFailure(request, approval.id, "這筆簽呈已完成，不能重複操作。", 409);
     }
   }
 
@@ -85,16 +106,15 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   if ((action === "ADD_APPROVER" || action === "TRANSFER") && !targetApproverId) {
-    return actionFailure(request, approval.id, "請先指定加簽或轉派的人員。", 400);
+    return actionFailure(request, approval.id, "請選擇要加簽或轉派的人員。", 400);
   }
 
   if (
     action === "APPROVE" &&
-    user.roleKey === "GENERAL_MANAGER" &&
     approval.approvalMode !== "CHECKBOX" &&
-    !approval.signatures.some((signature) => signature.signerId === user.id)
+    !approval.signatures.some((signature) => signature.signerId === user.id && signature.signaturePurpose === "APPROVER")
   ) {
-    return actionFailure(request, approval.id, "請先完成電子手寫簽名，再按核准。", 400);
+    return actionFailure(request, approval.id, "此簽呈需要手寫簽名，請先完成簽名再核准。", 400);
   }
 
   const fromStatus = approval.status;
@@ -103,7 +123,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   try {
     await prisma.$transaction(async (tx) => {
       if (action === "APPROVE") {
-        if (!incompleteStep) throw new ApprovalActionError("此簽呈目前沒有待簽核關卡。", 409);
+        if (!incompleteStep) throw new ApprovalActionError("這筆簽呈已沒有待處理關卡。", 409);
 
         const stepUpdate = await tx.approvalStep.updateMany({
           where: { id: incompleteStep.id, isCompleted: false },
@@ -111,7 +131,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         });
 
         if (stepUpdate.count !== 1) {
-          throw new ApprovalActionError("此關卡已被處理，請重新整理查看最新狀態。", 409);
+          throw new ApprovalActionError("簽核狀態已更新，請重新整理後再操作。", 409);
         }
 
         const remaining = approval.steps.filter((step) => !step.isCompleted && step.id !== incompleteStep.id);
@@ -138,7 +158,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         });
 
         if (requestUpdate.count !== 1) {
-          throw new ApprovalActionError("此簽呈已被處理，請重新整理查看最新狀態。", 409);
+          throw new ApprovalActionError("簽呈狀態已更新，請重新整理後再操作。", 409);
         }
       }
 
@@ -166,7 +186,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         await tx.approvalRequest.update({ where: { id: approval.id }, data: { status: toStatus } });
       }
 
-      await tx.approvalLog.create({
+      const approvalLog = await tx.approvalLog.create({
         data: {
           approvalRequestId: approval.id,
           actorId: user.id,
@@ -188,8 +208,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
           await createNotification(
             {
               userId: nextPendingStep.approverId,
-              title: nextPendingStep.title.includes("總經理") ? "有簽呈待總經理簽核" : "有簽呈待主管審核",
-              body: `${approval.subject} 已進入你的簽核關卡。`,
+              title: `待簽核：${nextPendingStep.title}`,
+              body: "前一關已完成簽核，請進入 JU數位管理查看。",
               type: "APPROVAL_PENDING",
               priority: "HIGH",
               targetUrl: `/approvals/${approval.id}`,
@@ -204,8 +224,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
         await createNotification(
           {
             userId: approval.applicantId,
-            title: toStatus === "APPROVED" ? "簽呈已核准" : "簽呈已完成一關簽核",
-            body: toStatus === "APPROVED" ? `${approval.subject} 已完成核准。` : `${approval.subject} 已進入下一關。`,
+            title: toStatus === "APPROVED" ? "簽呈已核准" : "簽呈已進入下一關",
+            body: toStatus === "APPROVED" ? "你的簽呈已完成核准，請進入 JU數位管理查看。" : "你的簽呈已通過目前關卡，將繼續送往下一關。",
             type: toStatus === "APPROVED" ? "APPROVAL_APPROVED" : "APPROVAL_PENDING",
             priority: toStatus === "APPROVED" ? "MEDIUM" : "LOW",
             targetUrl: `/approvals/${approval.id}`,
@@ -221,8 +241,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
         await createNotification(
           {
             userId: approval.applicantId,
-            title: action === "REJECT" ? "簽呈已駁回" : "簽呈退回修改",
-            body: comment ?? "請查看簽呈詳情。",
+            title: action === "REJECT" ? "簽呈已駁回" : "簽呈需退回修改",
+            body: action === "REJECT" ? "你的簽呈已被駁回，請進入 JU數位管理查看原因。" : "你的簽呈需要補充或修改，請進入 JU數位管理處理。",
             type: action === "REJECT" ? "APPROVAL_REJECTED" : "APPROVAL_REVISION_REQUIRED",
             priority: "HIGH",
             targetUrl: `/approvals/${approval.id}`,
@@ -234,20 +254,32 @@ export async function POST(request: Request, { params }: { params: { id: string 
         );
       }
 
-      if (action === "COMMENT" && user.id !== approval.applicantId) {
-        await createNotification(
-          {
-            userId: approval.applicantId,
-            title: "簽呈有新留言",
-            body: comment ?? "請查看簽呈詳情。",
-            type: "APPROVAL_COMMENT",
-            priority: "MEDIUM",
-            targetUrl: `/approvals/${approval.id}`,
-            sourceType: "approval",
-            sourceId: approval.id,
-            dedupeKey: `approval:${approval.id}:comment:${user.id}:${(comment ?? "").slice(0, 80)}`
-          },
-          tx
+      if (action === "COMMENT") {
+        const recipientIds = Array.from(
+          new Set([
+            approval.applicantId,
+            ...approval.steps.map((step) => step.approverId),
+            targetApproverId
+          ].filter((id): id is string => Boolean(id) && id !== user.id))
+        );
+
+        await Promise.all(
+          recipientIds.map((recipientId) =>
+            createNotification(
+              {
+                userId: recipientId,
+                title: user.id === approval.applicantId ? "申請人回覆簽呈" : "簽呈有新留言",
+                body: `${user.name ?? "相關人員"} 在簽呈中留下回覆，請進入 JU數位管理查看。`,
+                type: "APPROVAL_COMMENT",
+                priority: "HIGH",
+                targetUrl: `/approvals/${approval.id}`,
+                sourceType: "approval",
+                sourceId: approval.id,
+                dedupeKey: `approval:${approval.id}:comment:${approvalLog.id}:${recipientId}`
+              },
+              tx
+            )
+          )
         );
       }
     });
@@ -258,19 +290,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     throw error;
   }
 
-  const result =
-    action === "APPROVE"
-      ? toStatus === "APPROVED"
-        ? "approved-final"
-        : "approved"
-      : action === "REJECT"
-        ? "rejected"
-        : action === "REQUEST_REVISION"
-          ? "revision"
-          : action === "COMMENT"
-            ? "comment"
-            : "updated";
-
   revalidateApprovalNavigation(approval.id);
-  return appRedirect(approvalRedirectPath(approval.id, "actionResult", result));
+  return appRedirect(approvalRedirectPath(approval.id, "actionResult", resultMessage(action, toStatus)));
 }
