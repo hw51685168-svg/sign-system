@@ -5,7 +5,7 @@ import { EmptyState, LinkButton, Panel, StatusBadge, statusTone } from "@/compon
 import { isApprovalLiteMode } from "@/lib/app-mode";
 import { approvalStatusLabels, formatDate, roleLabels, safeText, taskStatusLabels } from "@/lib/labels";
 import { prisma } from "@/lib/prisma";
-import { announcementVisibleWhere, canAssignTasks, canCreateOperationalReports, scopedApprovalWhere, scopedTaskWhere } from "@/lib/rbac";
+import { announcementVisibleWhere, canAssignTasks, canCreateApprovals, canCreateOperationalReports, scopedApprovalWhere, scopedTaskWhere } from "@/lib/rbac";
 import { requireUser } from "@/lib/session";
 
 type StatusCard = {
@@ -230,7 +230,7 @@ export default async function DashboardPage() {
               <FileCheck2 className="h-5 w-5" />
               {profile.primaryLabel}
             </LinkButton>
-            {canCreateOperationalReports(user) ? (
+            {canCreateApprovals(user) ? (
               <LinkButton href="/approvals/new" variant="secondary">
                 <PlusCircle className="h-5 w-5" />
                 新增簽呈
@@ -239,7 +239,7 @@ export default async function DashboardPage() {
             {canAssignTasks(user) ? (
               <LinkButton href="/tasks/new" variant="secondary">
                 <ClipboardList className="h-5 w-5" />
-                指派任務
+                交辦任務
               </LinkButton>
             ) : null}
             {canCreateOperationalReports(user) ? (
@@ -254,7 +254,7 @@ export default async function DashboardPage() {
             </LinkButton>
             <LinkButton href="/services" variant="secondary">
               <Wrench className="h-5 w-5" />
-              Service Catalog（服務目錄）
+              部門服務需求
             </LinkButton>
           </div>
         </div>
@@ -297,13 +297,10 @@ export default async function DashboardPage() {
                   <div>
                     <p className="text-xl font-bold text-slate-950">{safeText(task.title, "未命名任務")}</p>
                     <p className="mt-1 text-base text-slate-700">
-                      負責人：{safeText(task.owner.name)} · 部門：{safeText(task.department?.name, "未指定")} · 截止：{formatDate(task.dueDate)}
+                      接收人：{safeText(task.owner.name)} · 接收部門：{safeText(task.department?.name, "未指定")} · 截止：{formatDate(task.dueDate)}
                     </p>
                   </div>
                   <StatusBadge label={taskStatusLabels[task.status]} tone={statusTone(task.status)} />
-                </div>
-                <div className="mt-4 h-3 rounded-full bg-slate-100">
-                  <div className="h-3 rounded-full bg-brand-700" style={{ width: `${Math.min(Math.max(task.progress, 0), 100)}%` }} />
                 </div>
               </a>
             ))}

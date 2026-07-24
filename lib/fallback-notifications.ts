@@ -46,7 +46,7 @@ export async function sendEmailFallback(notificationId: string, reason = "fallba
     const result = await transporter.sendMail({
       from,
       to: targetEmail,
-      subject: `[皇享系統] ${notification.title}`,
+      subject: `[JU數位管理] ${notification.title}`,
       text: `${notification.body}\n\n原因：${reason}\n連結：${absoluteUrl(notification.targetUrl)}`
     });
 
@@ -110,7 +110,7 @@ export async function sendLineFallback(notificationId: string, reason = "fallbac
         messages: [
           {
             type: "text",
-            text: `【皇享系統】${notification.title}\n${notification.body}\n原因：${reason}\n${absoluteUrl(notification.targetUrl)}`
+            text: `【JU數位管理】${notification.title}\n${notification.body}\n原因：${reason}\n${absoluteUrl(notification.targetUrl)}`
           }
         ]
       })

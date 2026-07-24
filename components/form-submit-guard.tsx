@@ -19,6 +19,22 @@ function notifyFormSubmitState(form: HTMLFormElement, state: "started" | "finish
   form.dispatchEvent(new CustomEvent("hx:form-submit-state", { detail: { state }, bubbles: true }));
 }
 
+function clearFormError(form: HTMLFormElement) {
+  form.querySelector<HTMLElement>("[data-form-error-banner='true']")?.remove();
+}
+
+function showFormError(form: HTMLFormElement, message: string) {
+  clearFormError(form);
+  const banner = document.createElement("div");
+  banner.dataset.formErrorBanner = "true";
+  banner.tabIndex = -1;
+  banner.className = "rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-base font-black text-red-800";
+  banner.textContent = message;
+  form.prepend(banner);
+  banner.focus({ preventScroll: true });
+  banner.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
 function isSubmitControl(element: HTMLElement | null): element is HTMLButtonElement | HTMLInputElement {
   return element instanceof HTMLButtonElement || element instanceof HTMLInputElement;
 }
@@ -54,6 +70,7 @@ function messageFromJson(value: unknown) {
 async function submitApiForm(form: HTMLFormElement, submitter: HTMLElement | null, actionUrl: URL) {
   const formData = buildFormData(form, submitter);
   form.dataset.submitting = "true";
+  clearFormError(form);
   notifyFormSubmitState(form, "started");
   setSubmitButtonsDisabled(form, true);
 
@@ -76,7 +93,7 @@ async function submitApiForm(form: HTMLFormElement, submitter: HTMLElement | nul
       const payload = await response.json().catch(() => null);
       const message = messageFromJson(payload);
       if (!response.ok) {
-        window.alert(message || "操作失敗，請重新整理後再試一次。");
+        showFormError(form, message || "操作失敗，請重新整理後再試一次。");
         return;
       }
       window.location.reload();
@@ -84,13 +101,13 @@ async function submitApiForm(form: HTMLFormElement, submitter: HTMLElement | nul
     }
 
     if (!response.ok) {
-      window.alert("操作失敗，請重新整理後再試一次。");
+      showFormError(form, "操作失敗，請重新整理後再試一次。");
       return;
     }
 
     window.location.reload();
   } catch {
-    window.alert("網路連線中斷，請確認連線後再試一次。");
+    showFormError(form, "網路連線中斷，請確認連線後再試一次。");
   } finally {
     delete form.dataset.submitting;
     setSubmitButtonsDisabled(form, false);

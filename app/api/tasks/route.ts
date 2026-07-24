@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { optionalTextValue, selectedValues, textValue } from "@/lib/form";
 import { createNotification } from "@/lib/notifications";
 import { revalidateGmTaskNavigation } from "@/lib/navigation-revalidate";
+import { parseUnitValue } from "@/lib/org-options";
 import { prisma } from "@/lib/prisma";
 import { canAssignTasks, canViewAllBusinessData, isBranchManager, isDepartmentManager } from "@/lib/rbac";
 import { appRedirect } from "@/lib/redirect";
@@ -20,6 +21,7 @@ export async function POST(request: Request) {
   const assistantIds = selectedValues(formData, "assistantIds");
   const uploads = await saveUploadedFiles(formData, "attachments");
   const dueDate = optionalTextValue(formData, "dueDate");
+  const requestedUnit = parseUnitValue(optionalTextValue(formData, "unitId"));
 
   const ownerId = textValue(formData, "ownerId");
   const owner = await prisma.user.findUnique({ where: { id: ownerId } });
@@ -39,8 +41,8 @@ export async function POST(request: Request) {
       content: textValue(formData, "content"),
       ownerId,
       creatorId: user.id,
-        departmentId: optionalTextValue(formData, "departmentId"),
-        storeId: user.storeId,
+        departmentId: requestedUnit?.type === "department" ? requestedUnit.id : optionalTextValue(formData, "departmentId"),
+        storeId: requestedUnit?.type === "store" ? requestedUnit.id : user.storeId,
       dueDate: dueDate ? new Date(`${dueDate}T23:59:59+08:00`) : null,
       priority: textValue(formData, "priority") as TaskPriority,
       assistants: {

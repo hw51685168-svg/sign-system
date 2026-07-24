@@ -8,10 +8,11 @@ import { canViewAllBusinessData, isBranchManager, isDepartmentManager, scopedSer
 import { requireUser } from "@/lib/session";
 import { getOrCreateConversation } from "@/lib/voice";
 
-export default async function ServiceRequestDetailPage({ params }: { params: { id: string } }) {
+export default async function ServiceRequestDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = await params;
   const user = await requireUser();
   const request = await prisma.serviceRequest.findFirst({
-    where: { AND: [{ id: params.id }, scopedServiceRequestWhere(user)] },
+    where: { AND: [{ id: resolvedParams.id }, scopedServiceRequestWhere(user)] },
     include: {
       requester: true,
       requesterDepartment: true,
@@ -57,9 +58,9 @@ export default async function ServiceRequestDetailPage({ params }: { params: { i
             </div>
             <dl className="mt-5 grid gap-4 text-base md:grid-cols-2">
               <div><dt className="font-bold text-slate-700">發起部門</dt><dd>{safeText(request.requesterDepartment?.name, "未指定")}</dd></div>
-              <div><dt className="font-bold text-slate-700">負責部門</dt><dd>{safeText(request.responsibleDepartment?.name, "未指定")}</dd></div>
+              <div><dt className="font-bold text-slate-700">承接部門</dt><dd>{safeText(request.responsibleDepartment?.name, "未指定")}</dd></div>
               <div><dt className="font-bold text-slate-700">發起人</dt><dd>{request.requester.name}</dd></div>
-              <div><dt className="font-bold text-slate-700">主責人</dt><dd>{safeText(request.owner?.name, "未指定")}</dd></div>
+              <div><dt className="font-bold text-slate-700">承辦人</dt><dd>{safeText(request.owner?.name, "未指定")}</dd></div>
               <div><dt className="font-bold text-slate-700">期限</dt><dd>{formatDate(request.dueDate)}</dd></div>
               <div><dt className="font-bold text-slate-700">建立時間</dt><dd>{formatDateTime(request.createdAt)}</dd></div>
             </dl>

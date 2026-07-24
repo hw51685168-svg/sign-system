@@ -17,7 +17,12 @@ function ScoreSelect({ name }: { name: string }) {
   );
 }
 
-export default async function PilotFeedbackPage({ searchParams }: { searchParams?: { submitted?: string } }) {
+export default async function PilotFeedbackPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ submitted?: string }>;
+}) {
+  const parsedSearchParams = (await searchParams) ?? {};
   const user = await requireUser();
   if (!canAccessPilot(user)) {
     redirect("/dashboard");
@@ -30,7 +35,7 @@ export default async function PilotFeedbackPage({ searchParams }: { searchParams
         title="主管實測回饋表"
         description="請用主管實測角度填寫，分數與文字都會進入管理中心，系統管理員可轉成改善任務。"
       />
-      {searchParams?.submitted ? (
+      {parsedSearchParams.submitted ? (
         <Panel className="mb-5 border-emerald-200 bg-emerald-50">
           <p className="font-bold text-emerald-800">已收到你的回饋，謝謝。系統管理員會在主管實測管理中心查看。</p>
         </Panel>

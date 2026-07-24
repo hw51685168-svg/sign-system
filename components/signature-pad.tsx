@@ -61,7 +61,7 @@ export function SignaturePad({ approvalId }: { approvalId: string }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     if (!hasStroke) {
-      window.alert("請先在簽名區完成手寫簽名。");
+      window.alert("請先在簽名框內完成手寫簽名。");
       return;
     }
     setSubmitting(true);
@@ -75,8 +75,8 @@ export function SignaturePad({ approvalId }: { approvalId: string }) {
       window.location.href = response.url || `/approvals/${approvalId}?signature=1`;
       return;
     }
-    const error = await response.json().catch(() => ({ error: "簽名儲存失敗，請重新簽名後再送出。" }));
-    window.alert(error.error || "簽名儲存失敗，請重新簽名後再送出。");
+    const error = await response.json().catch(() => ({ error: "簽名儲存失敗，請重新整理後再試一次。" }));
+    window.alert(error.error || "簽名儲存失敗，請重新整理後再試一次。");
     setSubmitting(false);
   }
 
@@ -104,10 +104,10 @@ export function SignaturePad({ approvalId }: { approvalId: string }) {
           onClick={submit}
           disabled={submitting || !hasStroke}
         >
-          {submitting ? "儲存中，請稍候" : "儲存手寫簽名"}
+          {submitting ? "儲存中..." : "儲存手寫簽名"}
         </button>
       </div>
-      <p className="text-base font-semibold text-slate-600">電腦可用滑鼠簽名，手機可用手指簽名。簽名儲存後會與此簽呈綁定，不可任意修改。</p>
+      <p className="text-base font-semibold text-slate-600">電腦可用滑鼠簽名，手機可用手指簽名。簽名儲存後會與此簽呈綁定。</p>
     </div>
   );
 }

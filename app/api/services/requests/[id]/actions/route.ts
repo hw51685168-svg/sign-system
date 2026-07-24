@@ -1,4 +1,4 @@
-import { ServiceRequestStatus } from "@prisma/client";
+﻿import { ServiceRequestStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { optionalTextValue, textValue } from "@/lib/form";
 import { createNotification } from "@/lib/notifications";
@@ -44,14 +44,15 @@ function nextStatus(action: string, current: ServiceRequestStatus) {
   return null;
 }
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const user = await requireUser();
   const formData = await request.formData();
   const action = textValue(formData, "action");
   const comment = optionalTextValue(formData, "comment");
 
   const serviceRequest = await prisma.serviceRequest.findFirst({
-    where: { AND: [{ id: params.id }, scopedServiceRequestWhere(user)] },
+    where: { AND: [{ id: id }, scopedServiceRequestWhere(user)] },
     include: {
       requester: true,
       owner: true,

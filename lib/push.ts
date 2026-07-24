@@ -19,11 +19,25 @@ function pushErrorDetails(error: unknown) {
   return JSON.stringify({
     message: error.message,
     statusCode: maybeWebPushError.statusCode ?? null,
-    body: maybeWebPushError.body ?? null,
-    headers: maybeWebPushError.headers ?? null
+    body: maybeWebPushError.body ? maybeWebPushError.body.slice(0, 240) : null
   });
 }
 
+function endpointHost(endpoint: string) {
+  try {
+    return new URL(endpoint).host;
+  } catch {
+    return "invalid";
+  }
+}
+
+function safePushBody(notification: { type: string; body: string }) {
+  if (notification.type === "APPROVAL_COMMENT") return "\u4f60\u6709\u4e00\u7b46\u7c3d\u5448\u7559\u8a00\uff0c\u8acb\u9032\u5165 JU\u6578\u4f4d\u7ba1\u7406\u67e5\u770b\u3002";
+  if (notification.type.startsWith("APPROVAL")) return "\u4f60\u6709\u4e00\u7b46\u7c3d\u5448\u901a\u77e5\uff0c\u8acb\u9032\u5165 JU\u6578\u4f4d\u7ba1\u7406\u67e5\u770b\u3002";
+  if (notification.type.startsWith("TASK")) return "\u4f60\u6709\u4e00\u7b46\u4efb\u52d9\u901a\u77e5\uff0c\u8acb\u9032\u5165 JU\u6578\u4f4d\u7ba1\u7406\u67e5\u770b\u3002";
+  if (notification.type === "TEST") return notification.body.slice(0, 80);
+  return "\u4f60\u6709\u4e00\u7b46\u65b0\u901a\u77e5\uff0c\u8acb\u9032\u5165 JU\u6578\u4f4d\u7ba1\u7406\u67e5\u770b\u3002";
+}
 function shouldDeactivateSubscription(error: unknown) {
   const maybeWebPushError = error as { statusCode?: number; body?: string } | null;
   const statusCode = maybeWebPushError?.statusCode;
@@ -58,11 +72,16 @@ export async function sendPushForNotification(notificationId: string) {
     where: { userId: notification.userId, isActive: true }
   });
 
+  if (subscriptions.length === 0) {
+    return { sent: 0, failed: 0, skipped: 1, reason: "No active Web Push subscription" };
+  }
+
   let sent = 0;
   let failed = 0;
 
   for (const subscription of subscriptions) {
     try {
+      const isUrgent = notification.priority === "URGENT" || notification.priority === "HIGH";
       await webpush.sendNotification(
         {
           endpoint: subscription.endpoint,
@@ -73,9 +92,9 @@ export async function sendPushForNotification(notificationId: string) {
         },
         JSON.stringify({
           title: notification.title,
-          body: notification.body,
-          icon: "/app-icon.svg",
-          badge: "/app-icon.svg",
+          body: safePushBody(notification),
+          icon: "/app-icon-192.png",
+          badge: "/app-icon-192.png",
           priority: notification.priority,
           timestamp: Date.now(),
           tag: notification.dedupeKey,
@@ -83,14 +102,19 @@ export async function sendPushForNotification(notificationId: string) {
             url: `/api/notifications/${notification.id}/click`,
             notificationId: notification.id,
             targetUrl: notification.targetUrl,
-            dedupeKey: notification.dedupeKey
+            dedupeKey: notification.dedupeKey,
+            platform: subscription.platform
           }
-        })
+        }),
+        {
+          TTL: isUrgent ? 300 : 3600,
+          urgency: isUrgent ? "high" : "normal"
+        }
       );
       sent += 1;
       await prisma.pushSubscription.update({
         where: { id: subscription.id },
-        data: { lastSuccessAt: new Date(), isActive: true }
+        data: { lastSuccessAt: new Date(), lastSeenAt: new Date(), lastFailedAt: null, lastFailureReason: null, isActive: true }
       });
       await prisma.notificationLog.create({
         data: {
@@ -99,7 +123,7 @@ export async function sendPushForNotification(notificationId: string) {
           channel: "PUSH",
           status: "SENT",
           sentAt: new Date(),
-          responsePayload: JSON.stringify({ endpoint: subscription.endpoint, result: "Push sent" })
+          responsePayload: JSON.stringify({ endpointHost: endpointHost(subscription.endpoint), platform: subscription.platform, result: "Push sent" })
         }
       });
     } catch (error) {
@@ -107,7 +131,11 @@ export async function sendPushForNotification(notificationId: string) {
       const deactivate = shouldDeactivateSubscription(error);
       await prisma.pushSubscription.update({
         where: { id: subscription.id },
-        data: { lastFailedAt: new Date(), ...(deactivate ? { isActive: false } : {}) }
+        data: {
+          lastFailedAt: new Date(),
+          lastFailureReason: pushErrorDetails(error).slice(0, 500),
+          ...(deactivate ? { isActive: false } : {})
+        }
       });
       await prisma.notificationLog.create({
         data: {
@@ -116,7 +144,7 @@ export async function sendPushForNotification(notificationId: string) {
           channel: "PUSH",
           status: "FAILED",
           errorMessage: pushErrorDetails(error),
-          responsePayload: JSON.stringify({ endpoint: subscription.endpoint, deactivated: deactivate })
+          responsePayload: JSON.stringify({ endpointHost: endpointHost(subscription.endpoint), platform: subscription.platform, deactivated: deactivate })
         }
       });
     }

@@ -1,16 +1,17 @@
-import { appRedirect } from "@/lib/redirect";
+﻿import { appRedirect } from "@/lib/redirect";
 import { createNotification } from "@/lib/notifications";
 import { canAccessPilotAdmin } from "@/lib/pilot";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 
-export async function POST(_request: Request, { params }: { params: { id: string } }) {
+export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const user = await requireUser();
   if (!canAccessPilotAdmin(user)) {
     return new Response("你沒有將回饋轉成任務的權限。", { status: 403 });
   }
 
-  const feedback = await prisma.pilotFeedback.findUnique({ where: { id: params.id }, include: { tester: true } });
+  const feedback = await prisma.pilotFeedback.findUnique({ where: { id: id }, include: { tester: true } });
   if (!feedback) return new Response("找不到回饋紀錄。", { status: 404 });
   if (feedback.convertedTaskId) return appRedirect(`/tasks/${feedback.convertedTaskId}`);
 

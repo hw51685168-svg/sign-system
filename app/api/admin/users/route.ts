@@ -1,4 +1,4 @@
-import bcrypt from "bcryptjs";
+﻿import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { optionalTextValue, textValue } from "@/lib/form";
 import { prisma } from "@/lib/prisma";
@@ -7,12 +7,9 @@ import { appRedirect } from "@/lib/redirect";
 import { requireUser } from "@/lib/session";
 import { demoMode } from "@/lib/demo";
 
-const defaultPassword = "aaaa8888";
-
 function redirectWithStatus(status: string) {
   return appRedirect(`/admin/users?status=${status}`);
 }
-
 export async function POST(request: Request) {
   const currentUser = await requireUser();
   if (demoMode) return appRedirect("/admin/users");
@@ -23,7 +20,8 @@ export async function POST(request: Request) {
 
   if (action === "CREATE") {
     const email = textValue(formData, "email").toLowerCase();
-    const password = textValue(formData, "password") || defaultPassword;
+    const password = textValue(formData, "password");
+    if (!password) return NextResponse.json({ error: "Password is required" }, { status: 400 });
 
     await prisma.user.upsert({
       where: { email },
@@ -77,7 +75,8 @@ export async function POST(request: Request) {
   }
 
   if (action === "RESET_PASSWORD") {
-    const password = textValue(formData, "password") || defaultPassword;
+    const password = textValue(formData, "password");
+    if (!password) return NextResponse.json({ error: "Password is required" }, { status: 400 });
     await prisma.user.update({
       where: { id: userId },
       data: { passwordHash: await bcrypt.hash(password, 10) }

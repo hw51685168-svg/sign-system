@@ -38,7 +38,7 @@ export const headOfficeRoleKeys: RoleKey[] = [
   "MANAGER"
 ];
 
-export const storeScopedRoleKeys: RoleKey[] = ["BRANCH_MANAGER", "STORE_STAFF"];
+export const storeScopedRoleKeys: RoleKey[] = ["BRANCH_MANAGER", "STORE_STAFF", "STORE_REQUESTER"];
 
 const legacyPermissions: Record<RoleKey, string[]> = {
   GENERAL_MANAGER: allPermissions,
@@ -56,6 +56,7 @@ const legacyPermissions: Record<RoleKey, string[]> = {
   MANAGER: ["task.view", "task.create", "task.assign", "task.update", "task.approve", "approval.view", "approval.create", "approval.approve", "approval.reject", "approval.return_revision", "issue.view", "issue.create", "issue.assign", "notification.view"],
   STAFF: ["task.view", "task.update", "approval.view", "approval.create", "issue.create", "notification.view", "inventory.create"],
   STORE_STAFF: ["task.view", "task.update", "approval.view", "approval.create", "issue.create", "notification.view", "inventory.create"],
+  STORE_REQUESTER: ["task.view", "approval.view", "approval.create", "notification.view"],
   SYSTEM_ADMIN: allPermissions,
   TESTER: ["task.view", "approval.view", "issue.view", "notification.view"]
 };
@@ -115,6 +116,11 @@ export function canApprove(user: CurrentUser) {
 
 export function canFinalApproveApproval(user: CurrentUser) {
   return user.roleKey === "GENERAL_MANAGER";
+}
+
+export function canCreateApprovals(user: CurrentUser) {
+  if (user.roleKey === "GENERAL_MANAGER") return false;
+  return hasPermission(user, "approval.create");
 }
 
 export function canAssignTasks(user: CurrentUser) {

@@ -1,0 +1,7 @@
+﻿<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">JU數位管理</string>
+    <string name="title_activity_main">JU數位管理</string>
+    <string name="package_name">com.huangxiang.approval</string>
+    <string name="custom_url_scheme">com.huangxiang.approval</string>
+</resources>

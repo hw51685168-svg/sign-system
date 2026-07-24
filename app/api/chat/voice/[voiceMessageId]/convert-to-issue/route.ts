@@ -1,4 +1,4 @@
-import { IssueSeverity, IssueType } from "@prisma/client";
+﻿import { IssueSeverity, IssueType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { optionalTextValue, textValue } from "@/lib/form";
 import { createNotification } from "@/lib/notifications";
@@ -8,9 +8,10 @@ import { appRedirect } from "@/lib/redirect";
 import { requireUser } from "@/lib/session";
 import { assertVoiceAccess, canConvertVoiceToIssue, writeVoiceAudit } from "@/lib/voice";
 
-export async function POST(request: Request, { params }: { params: { voiceMessageId: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ voiceMessageId: string }> }) {
+  const { voiceMessageId } = await params;
   const user = await requireUser();
-  const voice = await assertVoiceAccess(params.voiceMessageId, user);
+  const voice = await assertVoiceAccess(voiceMessageId, user);
   if (!voice) return NextResponse.json({ error: "找不到語音或沒有權限。" }, { status: 404 });
   if (!canConvertVoiceToIssue(user)) return NextResponse.json({ error: "沒有語音轉問題回報權限。" }, { status: 403 });
 

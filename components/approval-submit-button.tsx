@@ -39,10 +39,9 @@ export function ApprovalSubmitButton() {
       onClick={(event) => {
         const form = event.currentTarget.form;
         if (form && !form.checkValidity()) {
+          event.preventDefault();
           form.reportValidity();
-          return;
         }
-        setSubmitting(true);
       }}
     >
       <Send className="h-5 w-5" />

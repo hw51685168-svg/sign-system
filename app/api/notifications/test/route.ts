@@ -1,7 +1,9 @@
 import { NotificationPriority } from "@prisma/client";
 import { NextResponse } from "next/server";
+
 import { appRedirect } from "@/lib/redirect";
 import { sendFallbackChannelsForNotification } from "@/lib/fallback-notifications";
+import { sendNativePushForNotification } from "@/lib/native-push";
 import { createNotification, notifyUsers } from "@/lib/notifications";
 import { sendPushForNotification } from "@/lib/push";
 import { prisma } from "@/lib/prisma";
@@ -16,6 +18,30 @@ function wantsJson(request: Request) {
 function testResponse(request: Request, data: Record<string, unknown> = {}) {
   if (wantsJson(request)) return NextResponse.json({ ok: true, ...data });
   return appRedirect("/admin/notifications-test");
+}
+
+async function safeWebPush(notificationId: string) {
+  try {
+    return await sendPushForNotification(notificationId);
+  } catch (error) {
+    return { sent: 0, failed: 1, reason: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+async function safeNativePush(notificationId: string) {
+  try {
+    return await sendNativePushForNotification(notificationId);
+  } catch (error) {
+    return { sent: 0, failed: 1, skipped: 0, reason: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+async function safeFallback(notificationId: string) {
+  try {
+    return await sendFallbackChannelsForNotification(notificationId, "通知測試");
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 async function findVoiceTarget(user: Awaited<ReturnType<typeof requireUser>>, testKind: string) {
@@ -60,6 +86,36 @@ async function findVoiceTarget(user: Awaited<ReturnType<typeof requireUser>>, te
   };
 }
 
+function notificationText(testKind: string, priority: NotificationPriority, stamp: number, hasVoiceTarget: boolean) {
+  const timeText = new Date(stamp).toLocaleString("zh-TW");
+
+  if (testKind === "p0") {
+    return {
+      title: "P0 緊急測試通知",
+      body: `這是一則 P0 緊急測試通知，產生時間：${timeText}`
+    };
+  }
+
+  if (testKind === "p1") {
+    return {
+      title: "P1 重要測試通知",
+      body: `這是一則 P1 重要測試通知，產生時間：${timeText}`
+    };
+  }
+
+  if (testKind.startsWith("voice")) {
+    return {
+      title: priority === "URGENT" ? "P0 緊急語音通知測試" : "語音留言通知測試",
+      body: hasVoiceTarget ? "你有一則語音留言測試通知，請點擊查看。" : "目前沒有可用語音留言，這是一則語音通知流程測試。"
+    };
+  }
+
+  return {
+    title: priority === "URGENT" ? "緊急測試通知" : "JU數位管理測試通知",
+    body: `這是一則系統通知測試，產生時間：${timeText}`
+  };
+}
+
 export async function POST(request: Request) {
   const user = await requireUser();
   const formData = await request.formData();
@@ -70,29 +126,11 @@ export async function POST(request: Request) {
   const stamp = Date.now();
 
   const voiceTarget = testKind.startsWith("voice") ? await findVoiceTarget(user, testKind) : null;
-  const title =
-    testKind === "p0"
-      ? "P0 緊急測試通知"
-      : testKind === "p1"
-        ? "P1 重要測試通知"
-        : testKind.startsWith("voice")
-          ? priority === "URGENT"
-            ? "P0 緊急語音通知測試"
-            : "語音通知測試"
-          : priority === "URGENT"
-            ? "緊急測試通知"
-            : "測試通知";
-
-  const body =
-    testKind.startsWith("voice") && voiceTarget?.voiceId
-      ? "點擊後會跳到 Voice Message（語音留言）所在頁面，請確認可以播放與定位。"
-      : testKind.startsWith("voice")
-        ? "目前沒有可用語音，先建立一則測試語音後再測試跳轉。"
-        : `這是一則測試通知，產生時間：${new Date(stamp).toLocaleString("zh-TW")}`;
+  const text = notificationText(testKind, priority, stamp, Boolean(voiceTarget?.voiceId));
 
   const input = {
-    title,
-    body,
+    title: text.title,
+    body: text.body,
     type: testKind.startsWith("voice") ? "VOICE_MESSAGE" : "TEST",
     priority,
     targetUrl: voiceTarget?.targetUrl ?? "/notifications",
@@ -109,16 +147,19 @@ export async function POST(request: Request) {
       ...input,
       dedupeKey: testKind.startsWith("voice") ? input.dedupeKey : `test:self:${testKind}:${priority}:${stamp}`
     });
-    const pushResult = await sendPushForNotification(notification.id);
-    await sendFallbackChannelsForNotification(notification.id, "通知測試中心");
-    return testResponse(request, { notificationId: notification.id, pushResult });
+    const [pushResult, nativePushResult, fallbackResult] = await Promise.all([
+      safeWebPush(notification.id),
+      safeNativePush(notification.id),
+      safeFallback(notification.id)
+    ]);
+    return testResponse(request, { notificationId: notification.id, pushResult, nativePushResult, fallbackResult });
   }
 
   if (!canManageSystem(user) && !hasPermission(user, "notification.test_push")) {
     await createNotification({
       userId: user.id,
       title: "權限不足",
-      body: "你沒有發送多人測試通知的權限，請改用發送給自己的測試通知。",
+      body: "你沒有發送多人測試通知的權限。",
       type: "SYSTEM",
       priority: "HIGH",
       targetUrl: "/admin/notifications-test",
@@ -131,6 +172,8 @@ export async function POST(request: Request) {
 
   const roleKey = target === "managers" ? "MANAGER" : target === "executives" ? "GENERAL_MANAGER" : "STAFF";
   const users = await prisma.user.findMany({ where: { isActive: true, role: { key: roleKey } }, select: { id: true } });
-  await notifyUsers(users.map((item) => item.id), input);
-  return testResponse(request, { notifiedUsers: users.length });
+  const notifications = await notifyUsers(users.map((item) => item.id), input);
+  const nativeResults = await Promise.all(notifications.map((notification) => safeNativePush(notification.id)));
+  const pushResults = await Promise.all(notifications.map((notification) => safeWebPush(notification.id)));
+  return testResponse(request, { notifiedUsers: users.length, nativeResults, pushResults });
 }

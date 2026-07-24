@@ -39,23 +39,38 @@
 
 :root {
   color-scheme: light;
+  --surface: #ffffff;
+  --surface-soft: #f7fbf8;
+  --line: #d9e8df;
+  --ink: #12241a;
+  --muted: #5f7468;
 }
 
 body {
-  background: #f6f8f7;
-  color: #18251f;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(67, 168, 115, 0.16), transparent 32rem),
+    radial-gradient(circle at top right, rgba(120, 210, 160, 0.14), transparent 30rem),
+    linear-gradient(180deg, #fbfffc 0%, #f2faf5 52%, #eaf6ef 100%);
+  color: var(--ink);
   font-size: 18px;
   line-height: 1.7;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 input,
 select,
 textarea {
-  @apply min-h-14 rounded-md border border-slate-300 bg-white px-4 py-3 text-lg font-semibold outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100;
+  @apply box-border min-h-14 w-full min-w-0 max-w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-lg font-semibold text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-brand-600 focus:ring-4 focus:ring-brand-100;
+}
+
+select {
+  @apply cursor-pointer;
 }
 
 label {
-  @apply text-lg font-black text-slate-800;
+  @apply text-base font-black text-slate-800;
 }
 
 textarea {
@@ -76,8 +91,54 @@ html.high-contrast .text-slate-600 {
   color: #334155 !important;
 }
 
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+th {
+  @apply bg-slate-50 text-left text-sm font-black uppercase text-slate-700;
+}
+
+td {
+  @apply border-t border-slate-100;
+}
+
+details > summary {
+  user-select: none;
+}
+
+::selection {
+  background: rgba(67, 168, 115, 0.22);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #edf7f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #b8dcca;
+  border: 2px solid #edf7f1;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #78b994;
+}
+
 @media (max-width: 768px) {
   body {
     font-size: 18px;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
   }
 }

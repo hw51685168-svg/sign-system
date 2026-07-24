@@ -47,9 +47,16 @@ export async function readVoiceFile(storedFileName: string) {
   return readFile(path.join(voiceUploadRoot(), safeName));
 }
 
+export function voiceFilePath(storedFileName: string) {
+  const safeName = path.basename(storedFileName);
+  return path.join(voiceUploadRoot(), safeName);
+}
+
 function extensionFromMime(mimeType: string) {
   if (mimeType.includes("mp4")) return ".m4a";
+  if (mimeType.includes("aac")) return ".aac";
   if (mimeType.includes("mpeg")) return ".mp3";
+  if (mimeType.includes("ogg")) return ".ogg";
   if (mimeType.includes("wav")) return ".wav";
   return ".webm";
 }

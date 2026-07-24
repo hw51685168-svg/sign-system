@@ -18,6 +18,15 @@ function urlBase64ToUint8Array(base64String: string) {
   return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
 }
 
+function isIosDevice() {
+  const ua = navigator.userAgent;
+  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+function isStandaloneMode() {
+  return window.matchMedia("(display-mode: standalone)").matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+}
+
 async function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return null;
   const registration = await navigator.serviceWorker.register("/sw.js");
@@ -25,11 +34,15 @@ async function registerServiceWorker() {
   return navigator.serviceWorker.ready;
 }
 
+function canUsePushManager(registration: ServiceWorkerRegistration | null) {
+  return Boolean(registration && "pushManager" in registration && registration.pushManager);
+}
+
 export function NotificationClient() {
   const [toast, setToast] = useState<RecentNotification | null>(null);
 
   useEffect(() => {
-    const seenStorageKey = "hx-seen-notification-ids";
+    const seenStorageKey = "ju-seen-notification-ids";
 
     function loadSeenIds() {
       try {
@@ -44,51 +57,65 @@ export function NotificationClient() {
     }
 
     async function enablePush() {
+      if (isIosDevice() && !isStandaloneMode()) {
+        window.alert("請先用 Safari 分享 → 加入主畫面，再從桌面圖示開啟 JU數位管理，才能啟用 iPhone 推播。");
+        return;
+      }
+
       if (!("serviceWorker" in navigator) || !("Notification" in window) || !("PushManager" in window)) {
-        window.alert("這個瀏覽器目前不支援推播通知，請改用支援 PWA Push 的瀏覽器測試。");
+        window.alert("此瀏覽器不支援 Web Push。iPhone 請使用 Safari 加入主畫面後再開啟。");
         return;
       }
 
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
-        window.alert("尚未允許通知權限，請到瀏覽器或手機設定中開啟通知。");
+        window.alert("尚未允許通知權限，無法啟用背景推播。");
+        return;
+      }
+
+      const keyResponse = await fetch("/api/web-push/vapid-public-key", { cache: "no-store" });
+      if (!keyResponse.ok) {
+        window.alert("伺服器尚未設定 Web Push VAPID public key。");
+        return;
+      }
+      const { publicKey } = (await keyResponse.json()) as { publicKey?: string };
+      if (!publicKey) {
+        window.alert("伺服器沒有提供 Web Push VAPID public key。");
         return;
       }
 
       const registration = await registerServiceWorker();
       if (!registration) return;
-      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-      if (!vapidKey) {
-        registration.showNotification("推播尚未完成設定", {
-          body: "系統缺少 VAPID Key，請先由系統管理員完成推播環境設定。",
-          icon: "/app-icon.svg",
-          data: { url: "/notifications" }
-        });
+      if (!canUsePushManager(registration)) {
+        window.alert("目前瀏覽器無法建立 Web Push subscription，請確認是否從 iPhone 主畫面 PWA 開啟。");
         return;
       }
 
       const existing = await registration.pushManager.getSubscription();
-      const subscription =
-        existing ??
-        (await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidKey)
-        }));
-
-      await fetch("/api/push/subscribe", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(subscription)
+      if (existing) {
+        await existing.unsubscribe().catch(() => undefined);
+      }
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey)
       });
 
-      const notificationOptions: NotificationOptions & { vibrate?: number[] } = {
-        body: "推播通知已開啟，之後重要事項會提醒您。",
-        icon: "/app-icon.svg",
-        badge: "/app-icon.svg",
+      await fetch("/api/web-push/register", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...subscription.toJSON(),
+          platformHint: isIosDevice() && isStandaloneMode() ? "ios-pwa" : undefined
+        })
+      });
+
+      await registration.showNotification("JU數位管理推播已啟用", {
+        body: "本裝置已完成推播訂閱，請用測試通知確認鎖定畫面是否收到。",
+        icon: "/app-icon-192.png",
+        badge: "/app-icon-192.png",
         data: { url: "/notifications" },
         vibrate: [180, 80, 180]
-      };
-      registration.showNotification("推播通知已開啟", notificationOptions);
+      } as NotificationOptions & { vibrate?: number[] });
     }
 
     function handleClick(event: MouseEvent) {
@@ -96,7 +123,7 @@ export function NotificationClient() {
       if (!(target instanceof Element)) return;
       const button = target.closest("[data-enable-push]");
       if (!button) return;
-      void enablePush();
+      void enablePush().catch(() => undefined);
     }
 
     let initialized = false;
@@ -107,6 +134,7 @@ export function NotificationClient() {
         if (!response.ok) return;
         const payload = (await response.json()) as { notifications?: RecentNotification[] };
         const notifications = payload.notifications ?? [];
+        window.dispatchEvent(new CustomEvent("ju:notification-count", { detail: { count: Number((payload as { unreadCount?: number }).unreadCount ?? 0) } }));
         const seenIds = loadSeenIds();
 
         if (!initialized) {
@@ -126,13 +154,13 @@ export function NotificationClient() {
         window.setTimeout(() => setToast((current) => (current?.id === latest.id ? null : current)), 9000);
         navigator.vibrate?.(latest.priority === "URGENT" ? [250, 120, 250] : [180]);
       } catch {
-        // Login pages, route changes, and offline moments can fail silently. Push still handles notifications.
+        // Route changes, offline moments, and tunnel reconnects can fail silently.
       }
     }
 
     void registerServiceWorker().catch(() => undefined);
     void pollRecentNotifications();
-    const interval = window.setInterval(pollRecentNotifications, 8000);
+    const interval = window.setInterval(pollRecentNotifications, 20000);
     window.addEventListener("focus", pollRecentNotifications);
     document.addEventListener("click", handleClick);
     return () => {

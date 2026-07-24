@@ -1,4 +1,4 @@
-import { IssueStatus } from "@prisma/client";
+﻿import { IssueStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { optionalTextValue, textValue } from "@/lib/form";
 import { createNotification } from "@/lib/notifications";
@@ -7,7 +7,8 @@ import { canViewAllBusinessData, hasPermission, isDepartmentManager, scopedIssue
 import { appRedirect } from "@/lib/redirect";
 import { requireUser } from "@/lib/session";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const user = await requireUser();
   const formData = await request.formData();
   const action = textValue(formData, "action");
@@ -17,7 +18,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const assigneeId = optionalTextValue(formData, "assigneeId");
 
   const issue = await prisma.issueReport.findFirst({
-    where: { AND: [{ id: params.id }, scopedIssueWhere(user)] },
+    where: { AND: [{ id: id }, scopedIssueWhere(user)] },
     include: { reporter: true, assignee: true, assignedDepartment: true }
   });
   if (!issue) return NextResponse.json({ error: "找不到問題回報。" }, { status: 404 });

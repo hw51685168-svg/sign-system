@@ -1,5 +1,6 @@
 import { Megaphone } from "lucide-react";
 import { Button, Field, PageHeader, Panel } from "@/components/ui";
+import { visibleDepartmentOptions, visibleStoreOptions } from "@/lib/org-options";
 import { prisma } from "@/lib/prisma";
 import { canApprove } from "@/lib/rbac";
 import { requireUser } from "@/lib/session";
@@ -20,6 +21,8 @@ export default async function NewAnnouncementPage() {
         prisma.department.findMany({ orderBy: { name: "asc" } }),
         prisma.store.findMany({ where: { isActive: true }, orderBy: { name: "asc" } })
       ]);
+  const departmentOptions = visibleDepartmentOptions(departments);
+  const storeOptions = visibleStoreOptions(stores);
 
   return (
     <>
@@ -27,10 +30,14 @@ export default async function NewAnnouncementPage() {
       <Panel>
         <form action="/api/announcements" method="post" encType="multipart/form-data" className="grid gap-5">
           <Field label="公告標題">
-            <input name="title" required />
+            <input name="title" required placeholder="例如：7 月門市教育訓練通知、颱風天營業調整公告" />
           </Field>
           <Field label="公告內容">
-            <textarea name="content" required />
+            <textarea
+              name="content"
+              required
+              placeholder="請寫清楚公告對象、開始時間、需要同仁做什麼、是否要回覆確認。例如：請各館別主管於週五前確認 7 月訓練名單，閱讀後請按已讀確認。"
+            />
           </Field>
           <div className="grid gap-5 md:grid-cols-3">
             <Field label="發布範圍">
@@ -43,7 +50,7 @@ export default async function NewAnnouncementPage() {
             <Field label="指定部門">
               <select name="departmentId">
                 <option value="">未指定</option>
-                {departments.map((department) => (
+                {departmentOptions.map((department) => (
                   <option key={department.id} value={department.id}>
                     {department.name}
                   </option>
@@ -53,7 +60,7 @@ export default async function NewAnnouncementPage() {
             <Field label="指定門市">
               <select name="storeId">
                 <option value="">未指定</option>
-                {stores.map((store) => (
+                {storeOptions.map((store) => (
                   <option key={store.id} value={store.id}>
                     {store.name}
                   </option>

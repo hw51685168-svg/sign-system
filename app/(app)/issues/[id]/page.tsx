@@ -4,15 +4,17 @@ import { notFound } from "next/navigation";
 import { Button, Field, LinkButton, PageHeader, Panel, StatusBadge, statusTone } from "@/components/ui";
 import { VoiceThread } from "@/components/voice-thread";
 import { formatDateTime, issueSeverityLabels, issueStatusLabels, issueTypeLabels, safeText } from "@/lib/labels";
+import { visibleDepartmentOptions } from "@/lib/org-options";
 import { prisma } from "@/lib/prisma";
 import { scopedIssueWhere } from "@/lib/rbac";
 import { requireUser } from "@/lib/session";
 import { getOrCreateConversation } from "@/lib/voice";
 
-export default async function IssueDetailPage({ params }: { params: { id: string } }) {
+export default async function IssueDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = await params;
   const user = await requireUser();
   const issue = await prisma.issueReport.findFirst({
-    where: { AND: [{ id: params.id }, scopedIssueWhere(user)] },
+    where: { AND: [{ id: resolvedParams.id }, scopedIssueWhere(user)] },
     include: {
       store: true,
       reporter: true,
@@ -28,6 +30,7 @@ export default async function IssueDetailPage({ params }: { params: { id: string
     prisma.department.findMany({ orderBy: { name: "asc" } }),
     prisma.user.findMany({ where: { isActive: true }, include: { role: true }, orderBy: { name: "asc" } })
   ]);
+  const departmentOptions = visibleDepartmentOptions(departments);
   const conversation = await getOrCreateConversation({
     type: "ISSUE",
     sourceType: "issue",
@@ -55,8 +58,8 @@ export default async function IssueDetailPage({ params }: { params: { id: string
             </div>
             <dl className="mt-5 grid gap-4 text-base md:grid-cols-2">
               <div><dt className="font-bold text-slate-700">門市</dt><dd>{safeText(issue.store?.name, "未指定")}</dd></div>
-              <div><dt className="font-bold text-slate-700">處理部門</dt><dd>{safeText(issue.assignedDepartment?.name, "未指定")}</dd></div>
-              <div><dt className="font-bold text-slate-700">處理人</dt><dd>{safeText(issue.assignee?.name, "未指定")}</dd></div>
+              <div><dt className="font-bold text-slate-700">承接部門</dt><dd>{safeText(issue.assignedDepartment?.name, "未指定")}</dd></div>
+              <div><dt className="font-bold text-slate-700">承辦人</dt><dd>{safeText(issue.assignee?.name, "未指定")}</dd></div>
               <div><dt className="font-bold text-slate-700">建立時間</dt><dd>{formatDateTime(issue.createdAt)}</dd></div>
             </dl>
             <div className="mt-6 rounded-lg bg-slate-50 p-4 text-lg leading-8 text-slate-800 whitespace-pre-wrap">{safeText(issue.description, "尚無問題描述")}</div>
@@ -93,13 +96,13 @@ export default async function IssueDetailPage({ params }: { params: { id: string
                   {Object.values(IssueStatus).map((status) => <option key={status} value={status}>{issueStatusLabels[status]}</option>)}
                 </select>
               </Field>
-              <Field label="指派處理部門">
+              <Field label="交給哪個部門處理">
                 <select name="assignedDepartmentId" defaultValue={issue.assignedDepartmentId ?? ""}>
                   <option value="">未指定</option>
-                  {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
+                  {departmentOptions.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
                 </select>
               </Field>
-              <Field label="處理人">
+              <Field label="承辦人">
                 <select name="assigneeId" defaultValue={issue.assigneeId ?? ""}>
                   <option value="">未指定</option>
                   {users.map((item) => <option key={item.id} value={item.id}>{item.name}（{item.role.name}）</option>)}

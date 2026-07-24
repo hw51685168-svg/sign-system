@@ -9,26 +9,26 @@ export const errorSeverityLabels: Record<ErrorSeverity, string> = {
 
 export const errorStatusLabels: Record<ErrorReportStatus, string> = {
   OPEN: "未處理",
-  TRIAGED: "已分流",
+  TRIAGED: "已分類",
   CODEX_REQUESTED: "已建立 Codex 修復單",
   IN_PROGRESS: "修復中",
   FIXED: "已修復",
   VERIFIED: "已驗證",
-  CLOSED: "已關閉",
-  IGNORED: "忽略"
+  CLOSED: "已結案",
+  IGNORED: "已忽略"
 };
 
 export const codexFixStatusLabels: Record<CodexFixRequestStatus, string> = {
   DRAFT: "草稿",
-  READY: "待送 Codex",
+  READY: "待交給 Codex",
   SENT_TO_CODEX: "已寫入 CODEX_INBOX",
   GITHUB_ISSUE_CREATED: "已建立 GitHub Issue",
   IN_PROGRESS: "修復中",
   FIX_PROPOSED: "已有修復方案",
   FIXED: "已修復",
   VERIFIED: "已驗證",
-  CLOSED: "已關閉",
-  REJECTED: "不處理"
+  CLOSED: "已結案",
+  REJECTED: "不採用"
 };
 
 export function errorSeverityTone(severity: ErrorSeverity) {

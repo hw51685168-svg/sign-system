@@ -1,7 +1,7 @@
-import type { RoleKey } from "@prisma/client";
+﻿import type { RoleKey } from "@prisma/client";
 
 export const demoMode = process.env.DEMO_MODE === "true";
-export const demoPassword = "aaaa8888";
+export const demoPassword = process.env.DEMO_PASSWORD || "";
 
 export const demoRoles = [
   { id: "role-gm", key: "GENERAL_MANAGER" as RoleKey, name: "\u7e3d\u7d93\u7406" },

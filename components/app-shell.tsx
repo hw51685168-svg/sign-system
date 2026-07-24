@@ -2,7 +2,6 @@ import {
   Bell,
   BookOpenCheck,
   Bug,
-  Check,
   ClipboardCheck,
   ClipboardList,
   FileCheck2,
@@ -96,8 +95,8 @@ const navItems: NavItem[] = [
 ];
 
 const groupLabels: Record<NavGroup, string> = {
-  main: "主要工作",
-  work: "營運工具",
+  main: "主要功能",
+  work: "工作表單",
   pilot: "主管測試區",
   manage: "系統管理"
 };
@@ -112,24 +111,22 @@ function liteNavItems(roleKey: RoleKey | undefined, storeId?: string | null): Na
       { href: "/settings/notifications", label: "系統設定", icon: Smartphone, group: "manage" },
       { href: "/admin/errors", label: "錯誤中心", icon: Bug, group: "manage" },
       { href: "/admin/pilot", label: "測試管理", icon: ClipboardCheck, group: "manage" },
-      { href: "/tasks", label: "進階功能", icon: Wrench, group: "manage" }
+      { href: "/tasks", label: "派發任務", icon: ClipboardList, group: "manage" }
     ];
   }
+
   if (roleKey === "GENERAL_MANAGER") {
     return [
       { href: "/", label: "首頁", icon: Gauge, group: "main" },
-      { href: "/approvals/progress?view=pending", label: "待簽核", icon: FileCheck2, group: "main" },
+      { href: "/approvals/progress?view=pending", label: "待我簽核", icon: FileCheck2, group: "main" },
       { href: "/approvals/progress", label: "全部簽呈", icon: ClipboardCheck, group: "main" },
-      { href: "/gm/tasks", label: "任務發派", icon: ClipboardList, group: "main" },
-      { href: "/gm/tasks?view=progress", label: "交辦進度", icon: Check, group: "main" },
+      { href: "/gm/tasks", label: "總經理交辦", icon: ClipboardList, group: "main" },
       { href: "/notifications", label: "通知", icon: Bell, group: "main" },
       { href: "/account", label: "設定", icon: Settings, group: "main" }
     ];
   }
-  if (
-    roleKey &&
-    (headOfficeRoleKeys.includes(roleKey) || (roleKey === "STAFF" && !storeId))
-  ) {
+
+  if (roleKey && (headOfficeRoleKeys.includes(roleKey) || (roleKey === "STAFF" && !storeId))) {
     return [
       { href: "/", label: "首頁", icon: Gauge, group: "main" },
       { href: "/approvals/progress?view=pending", label: "待審核簽呈", icon: FileCheck2, group: "main" },
@@ -139,6 +136,7 @@ function liteNavItems(roleKey: RoleKey | undefined, storeId?: string | null): Na
       { href: "/account", label: "設定", icon: Settings, group: "main" }
     ];
   }
+
   if (roleKey && (storeScopedRoleKeys.includes(roleKey) || storeId)) {
     return [
       { href: "/", label: "首頁", icon: Gauge, group: "main" },
@@ -149,6 +147,7 @@ function liteNavItems(roleKey: RoleKey | undefined, storeId?: string | null): Na
       { href: "/account", label: "設定", icon: Settings, group: "main" }
     ];
   }
+
   return [
     { href: "/", label: "首頁", icon: Gauge, group: "main" },
     { href: "/approvals/new", label: "填寫簽呈", icon: FileCheck2, group: "main" },
@@ -163,11 +162,12 @@ function liteMobileItems(roleKey: RoleKey | undefined, storeId?: string | null):
     return [
       { href: "/", label: "首頁", icon: Gauge, group: "main" },
       { href: "/approvals/progress?view=pending", label: "簽核", icon: FileCheck2, group: "main" },
-      { href: "/gm/tasks", label: "發派", icon: ClipboardList, group: "main" },
+      { href: "/gm/tasks", label: "交辦", icon: ClipboardList, group: "main" },
       { href: "/approvals/progress", label: "進度", icon: ClipboardCheck, group: "main" },
       { href: "/account", label: "設定", icon: Settings, group: "main" }
     ];
   }
+
   if (roleKey === "SYSTEM_ADMIN") {
     return [
       { href: "/", label: "首頁", icon: Gauge, group: "main" },
@@ -177,6 +177,7 @@ function liteMobileItems(roleKey: RoleKey | undefined, storeId?: string | null):
       { href: "/account", label: "設定", icon: Settings, group: "main" }
     ];
   }
+
   if (roleKey && (headOfficeRoleKeys.includes(roleKey) || (roleKey === "STAFF" && !storeId))) {
     return [
       { href: "/", label: "首頁", icon: Gauge, group: "main" },
@@ -186,6 +187,7 @@ function liteMobileItems(roleKey: RoleKey | undefined, storeId?: string | null):
       { href: "/account", label: "設定", icon: Settings, group: "main" }
     ];
   }
+
   if (roleKey && (storeScopedRoleKeys.includes(roleKey) || storeId)) {
     return [
       { href: "/", label: "首頁", icon: Gauge, group: "main" },
@@ -195,6 +197,7 @@ function liteMobileItems(roleKey: RoleKey | undefined, storeId?: string | null):
       { href: "/account", label: "設定", icon: Settings, group: "main" }
     ];
   }
+
   return [
     { href: "/", label: "首頁", icon: Gauge, group: "main" },
     { href: "/approvals/new", label: "填寫", icon: FileCheck2, group: "main" },
@@ -206,6 +209,10 @@ function liteMobileItems(roleKey: RoleKey | undefined, storeId?: string | null):
 
 function canSeeItem(roleKey: RoleKey | undefined, item: NavItem) {
   return !item.roles || Boolean(roleKey && item.roles.includes(roleKey));
+}
+
+function navLabel(item: NavItem) {
+  return item.label;
 }
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
@@ -231,15 +238,13 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     : 0;
 
   return (
-    <div className="min-h-screen bg-[#f4f7f6]">
-      <aside className={`fixed inset-y-0 left-0 hidden ${sidebarWidth} border-r border-slate-200 bg-white lg:block`}>
-        <div className="flex h-20 items-center gap-4 border-b border-slate-200 px-5">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-brand-700 text-white">
-            <ShieldCheck className="h-6 w-6" />
-          </div>
+    <div className="min-h-screen bg-transparent">
+      <aside className={`fixed inset-y-0 left-0 hidden ${sidebarWidth} border-r border-white/10 bg-gradient-to-b from-brand-800 via-brand-700 to-[#123827] text-white shadow-[18px_0_40px_rgba(23,75,53,0.16)] lg:block`}>
+        <div className="flex h-20 items-center gap-4 border-b border-white/10 px-5">
+          <img className="h-12 w-12 rounded-xl bg-white object-cover shadow-sm ring-1 ring-white/30" src="/app-icon-192.png" alt="JU數位管理" />
           <div>
-            <p className="text-xl font-black text-slate-950">{liteMode ? "電子簽呈系統" : "皇享企業系統"}</p>
-            <p className="text-sm font-semibold text-slate-500">{liteMode ? "簡化模式" : pilotVersionLabel}</p>
+            <p className="text-xl font-black text-white">JU數位管理</p>
+            <p className="text-sm font-semibold text-white/65">{liteMode ? "流程管理 × 核准簽署" : pilotVersionLabel}</p>
           </div>
         </div>
         <nav className="grid gap-4 p-4">
@@ -248,7 +253,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             if (items.length === 0) return null;
             return (
               <div key={group}>
-                {!liteMode || group === "manage" ? <p className="mb-2 px-3 text-xs font-bold uppercase tracking-wide text-slate-400">{groupLabels[group]}</p> : null}
+                {!liteMode || group === "manage" ? <p className="mb-2 px-3 text-xs font-bold uppercase tracking-wide text-white/45">{liteMode ? "系統管理" : groupLabels[group]}</p> : null}
                 <div className="grid gap-2">
                   {items.map((item) => {
                     const Icon = item.icon;
@@ -256,12 +261,12 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                       <a
                         key={item.href}
                         href={item.href}
-                        className="flex min-h-14 items-center gap-3 rounded-lg px-3 text-lg font-black text-slate-800 transition hover:bg-brand-50 hover:text-brand-800"
+                        className="flex min-h-14 items-center gap-3 rounded-lg px-3 text-lg font-black text-white/85 transition hover:bg-white/12 hover:text-white"
                       >
-                        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white/75 ring-1 ring-white/10">
                           <Icon className="h-5 w-5" />
                         </span>
-                        {item.label}
+                        {navLabel(item)}
                       </a>
                     );
                   })}
@@ -272,42 +277,42 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
       </aside>
       <div className={desktopWidth}>
-        <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur md:px-8">
+        <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between border-b border-white/70 bg-white/90 px-4 shadow-sm backdrop-blur md:px-8">
           <div className="min-w-0">
-            <p className="truncate text-base font-bold text-slate-900">{user?.name ?? "未登入使用者"}</p>
+            <p className="truncate text-base font-black text-slate-900">{user?.name ?? "未登入使用者"}</p>
             <p className="truncate text-sm text-slate-500">
-              {user?.roleKey ? roleLabels[user.roleKey] : user?.roleName ?? "-"} · {user?.departmentName ?? "未指定部門"}
+              {user?.roleKey ? roleLabels[user.roleKey] : user?.roleName ?? "-"} · {user?.departmentName ?? "未設定部門"}
               {user?.storeName ? ` · ${user.storeName}` : ""}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <AccessibilityToggle />
-            <a className="relative inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-slate-600 hover:bg-slate-100" href="/notifications">
+            <a className="relative inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-black text-slate-600 hover:bg-brand-50 hover:text-brand-800" href="/notifications">
               <Bell className="h-5 w-5" />
               <span className="hidden sm:inline">通知</span>
               <NotificationBadge initialCount={unreadNotifications} />
             </a>
-            <a className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-slate-600 hover:bg-slate-100" href="/account">
+            <a className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-black text-slate-600 hover:bg-brand-50 hover:text-brand-800" href="/account">
               <Settings className="h-4 w-4" />
               設定
             </a>
           </div>
         </header>
-        <main className="mx-auto max-w-7xl px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 md:px-8 lg:pb-8">{children}</main>
-        <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-slate-200 bg-white/95 px-1 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
+        <main className="mx-auto max-w-7xl px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6 md:px-8 lg:pb-10">{children}</main>
+        <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-white/80 bg-white/95 px-1 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_32px_rgba(15,23,42,0.10)] backdrop-blur lg:hidden">
           {mobileItems.map((item) => {
             const Icon = item.icon;
             return (
               <a
                 key={item.href}
                 href={item.href}
-                className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg text-xs font-bold text-slate-700 hover:bg-brand-50 hover:text-brand-800"
+                className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg text-xs font-black text-slate-700 hover:bg-brand-50 hover:text-brand-800"
               >
                 <span className="relative">
                   <Icon className="h-5 w-5" />
                   {item.href === "/notifications" ? <NotificationBadge initialCount={unreadNotifications} variant="dot" /> : null}
                 </span>
-                <span className="max-w-full truncate">{item.label}</span>
+                <span className="max-w-full truncate">{navLabel(item)}</span>
               </a>
             );
           })}

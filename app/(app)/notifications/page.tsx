@@ -12,21 +12,39 @@ const priorityIcon = {
   LOW: CheckCircle2
 } as const;
 
+const sourceTypeLabels: Record<string, string> = {
+  approval: "簽呈通知",
+  task: "交辦任務",
+  issue: "問題回報",
+  service_request: "服務需求",
+  announcement: "公告",
+  web_push_test: "推播測試",
+  native_push_test: "手機通知測試",
+  notification_escalation: "催辦提醒",
+  system: "系統通知"
+};
+
+function sourceTypeLabel(sourceType?: string | null) {
+  if (!sourceType) return sourceTypeLabels.system;
+  return sourceTypeLabels[sourceType] ?? sourceType;
+}
+
 export default async function NotificationsPage({
   searchParams
 }: {
-  searchParams: { priority?: string; unread?: string; type?: string };
+  searchParams?: Promise<{ priority?: string; unread?: string; type?: string }>;
 }) {
+  const parsedSearchParams = (await searchParams) ?? {};
   const user = await requireUser();
-  const priority = ["URGENT", "HIGH", "MEDIUM", "LOW"].includes(searchParams.priority ?? "") ? searchParams.priority : undefined;
-  const unreadOnly = searchParams.unread === "true";
+  const priority = ["URGENT", "HIGH", "MEDIUM", "LOW"].includes(parsedSearchParams.priority ?? "") ? parsedSearchParams.priority : undefined;
+  const unreadOnly = parsedSearchParams.unread === "true";
 
   const notifications = await prisma.notification.findMany({
     where: {
       userId: user.id,
       ...(priority ? { priority: priority as "URGENT" | "HIGH" | "MEDIUM" | "LOW" } : {}),
       ...(unreadOnly ? { isRead: false } : {}),
-      ...(searchParams.type ? { type: searchParams.type } : {})
+      ...(parsedSearchParams.type ? { type: parsedSearchParams.type } : {})
     },
     orderBy: [{ isRead: "asc" }, { priority: "asc" }, { createdAt: "desc" }],
     take: 80
@@ -90,7 +108,7 @@ export default async function NotificationsPage({
                         </div>
                         <p className="mt-1 text-base leading-7">{notification.body}</p>
                         <p className="mt-2 text-sm opacity-75">
-                          {formatDateTime(notification.createdAt)} · {notification.sourceType ?? "system"}
+                          {formatDateTime(notification.createdAt)} · {sourceTypeLabel(notification.sourceType)}
                         </p>
                       </div>
                     </div>

@@ -2,18 +2,19 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { BarChart3, CheckCircle2, Eye, EyeOff, FilePenLine, Leaf, LockKeyhole, Mail, ShieldCheck, Smartphone, UserCheck } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { BarChart3, CheckCircle2, Eye, EyeOff, FilePenLine, LockKeyhole, Mail, ShieldCheck, Smartphone, UserCheck } from "lucide-react";
 
 const rememberedEmailKey = "huangxiang-login-email";
 
 function BrandMark() {
   return (
     <div className="flex items-center gap-3">
-      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/95 text-brand-700 shadow-sm">
-        <Leaf className="h-6 w-6" />
+      <img className="h-12 w-12 rounded-xl bg-white object-cover shadow-sm ring-1 ring-white/40" src="/app-icon-192.png" alt="JU數位管理" />
+      <div>
+        <p className="text-xl font-black tracking-wide text-white">JU數位管理</p>
+        <p className="text-sm font-bold text-white/70">流程管理 × 核准簽署 × 安全追蹤</p>
       </div>
-      <p className="text-lg font-black tracking-wide text-white">皇享企業管理系統</p>
     </div>
   );
 }
@@ -41,7 +42,6 @@ function BenefitItem({ icon: Icon, title, body }: { icon: typeof ShieldCheck; ti
 }
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -64,33 +64,39 @@ function LoginForm() {
     setLoading(true);
     setError("");
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false
-    });
+    try {
+      const callbackUrl = searchParams.get("callbackUrl") ?? "/";
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+        callbackUrl
+      });
 
-    setLoading(false);
+      if (!result?.ok || result.error) {
+        setError("登入失敗，請確認帳號或密碼是否正確。");
+        return;
+      }
 
-    if (result?.error) {
-      setError("登入失敗，請確認帳號或密碼是否正確。");
-      return;
+      if (rememberEmail) {
+        window.localStorage.setItem(rememberedEmailKey, email);
+      } else {
+        window.localStorage.removeItem(rememberedEmailKey);
+      }
+
+      // Let the browser perform a single full navigation after NextAuth sets the session cookie.
+      window.location.assign(result.url || callbackUrl);
+    } catch {
+      setError("登入暫時無法完成，請確認網路後再試一次。");
+    } finally {
+      setLoading(false);
     }
-
-    if (rememberEmail) {
-      window.localStorage.setItem(rememberedEmailKey, email);
-    } else {
-      window.localStorage.removeItem(rememberedEmailKey);
-    }
-
-    router.push(searchParams.get("callbackUrl") ?? "/");
-    router.refresh();
   }
 
   return (
     <form className="grid gap-5" onSubmit={onSubmit}>
       <div className="grid gap-2">
-        <label className="text-base font-black text-slate-900" htmlFor="email">帳號</label>
+        <label className="text-base font-black text-slate-900" htmlFor="email">帳號 Email</label>
         <div className="relative">
           <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
           <input
@@ -101,7 +107,7 @@ function LoginForm() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             autoComplete="username"
-            placeholder="請輸入帳號或 Email"
+            placeholder="請輸入公司帳號 Email"
             required
           />
         </div>
@@ -144,22 +150,22 @@ function LoginForm() {
           />
           記住帳號
         </label>
-        <p className="text-sm font-semibold text-slate-500">忘記密碼請洽系統管理員</p>
+        <p className="text-sm font-semibold text-slate-500">請勿把帳密提供給非授權人員。</p>
       </div>
 
       {error ? <p className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-base font-bold text-red-700">{error}</p> : null}
 
       <button
-        className="inline-flex min-h-14 items-center justify-center rounded-md bg-brand-700 px-5 text-xl font-black text-white shadow-sm transition hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-70"
+        className="inline-flex min-h-14 items-center justify-center rounded-lg bg-brand-700 px-5 text-xl font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-70"
         type="submit"
         disabled={loading}
       >
-        {loading ? "登入中" : "登入"}
+        {loading ? "登入中..." : "登入"}
       </button>
 
       <div className="flex gap-3 rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 text-brand-900">
         <ShieldCheck className="mt-1 h-6 w-6 flex-none text-brand-700" />
-        <p className="text-base font-bold leading-7">目前為內部測試版，請勿輸入正式敏感資料。</p>
+        <p className="text-base font-bold leading-7">本系統僅供公司授權同仁使用，所有簽呈、任務與通知操作都會留下紀錄。</p>
       </div>
     </form>
   );
@@ -167,10 +173,10 @@ function LoginForm() {
 
 function LoginShell() {
   return (
-    <main className="min-h-screen overflow-hidden bg-[#f5f8f4] text-slate-950">
+    <main className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(67,168,115,0.16),transparent_34rem),radial-gradient(circle_at_top_right,rgba(120,210,160,0.14),transparent_30rem),linear-gradient(180deg,#fbfffc_0%,#f2faf5_55%,#eaf6ef_100%)] text-slate-950">
       <div className="mx-auto grid min-h-screen w-full max-w-[1500px] items-center gap-6 px-4 py-6 lg:grid-cols-[1.02fr_1fr] lg:px-8">
-        <section className="relative hidden min-h-[680px] overflow-hidden rounded-lg bg-brand-800 p-10 text-white shadow-soft lg:block">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_30%,rgba(255,255,255,0.28),transparent_24%),linear-gradient(135deg,#063d24_0%,#15703d_52%,#dcefe0_100%)]" />
+        <section className="relative hidden min-h-[680px] overflow-hidden rounded-lg bg-brand-800 p-10 text-white shadow-[0_20px_54px_rgba(15,23,42,0.18)] lg:block">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_30%,rgba(255,255,255,0.32),transparent_24%),linear-gradient(135deg,#174b35_0%,#2f8f60_48%,#d8f4e8_100%)]" />
           <div className="absolute -bottom-16 -left-10 h-56 w-72 rounded-[55%_45%_0_0] bg-white/12" />
           <div className="absolute bottom-0 right-0 h-60 w-[620px] rounded-tl-[100%] bg-white/18" />
           <div className="absolute right-12 top-28 h-48 w-36 rotate-12 rounded-2xl border-4 border-white/20" />
@@ -182,21 +188,22 @@ function LoginShell() {
             <BrandMark />
 
             <div className="max-w-xl">
-              <h1 className="text-5xl font-black leading-tight">內部電子簽呈系統</h1>
-              <p className="mt-5 text-2xl font-bold leading-10 text-white/90">線上填寫、簽核與追蹤公司內部簽呈</p>
+              <img className="mb-8 w-full max-w-lg rounded-lg bg-white/95 object-contain p-5 shadow-sm" src="/brand/ju-digital-management-horizontal.png" alt="JU數位管理" />
+              <h1 className="text-5xl font-black leading-tight">流程更清楚，簽核更安心。</h1>
+              <p className="mt-5 text-2xl font-bold leading-10 text-white/90">把簽呈、任務、附件、通知與追蹤整合在同一個地方。</p>
               <div className="mt-10 flex items-center gap-3 text-white/70">
                 <span className="h-px flex-1 bg-white/45" />
                 <span className="h-2 w-2 rounded-full bg-white" />
                 <span className="h-px flex-1 bg-white/45" />
               </div>
               <div className="mt-10 grid grid-cols-3 gap-5">
-                <FeatureItem icon={FilePenLine} title="線上填寫" body="快速填寫簽呈" />
-                <FeatureItem icon={UserCheck} title="流程簽核" body="即時簽核處理" />
-                <FeatureItem icon={BarChart3} title="進度追蹤" body="流程透明可查" />
+                <FeatureItem icon={FilePenLine} title="線上填寫" body="快速建立簽呈與任務" />
+                <FeatureItem icon={UserCheck} title="流程簽核" body="清楚知道誰處理中" />
+                <FeatureItem icon={BarChart3} title="進度追蹤" body="通知與紀錄可查" />
               </div>
             </div>
 
-            <p className="text-sm font-semibold text-white/75">皇享企業內部系統 · 僅供授權同仁使用</p>
+            <p className="text-sm font-semibold text-white/75">JU數位管理 · 僅供授權同仁使用</p>
           </div>
         </section>
 
@@ -204,19 +211,15 @@ function LoginShell() {
           <div className="absolute inset-x-0 bottom-0 h-32 rounded-t-[80%] bg-brand-100/70 lg:hidden" />
           <div className="relative z-10 mx-auto w-full max-w-[520px]">
             <div className="mb-6 grid justify-items-center gap-3 text-center lg:hidden">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-700 text-white shadow-sm">
-                <Leaf className="h-8 w-8" />
-              </div>
-              <p className="text-lg font-black text-slate-950">皇享企業管理系統</p>
-              <h1 className="text-4xl font-black leading-tight text-brand-800">內部電子簽呈系統</h1>
-              <p className="text-lg font-bold text-slate-600">線上填寫、簽核與追蹤</p>
+              <img className="h-20 w-20 rounded-2xl object-cover shadow-sm" src="/app-icon-192.png" alt="JU數位管理" />
+              <p className="text-lg font-black text-slate-950">JU數位管理</p>
+              <h1 className="text-4xl font-black leading-tight text-brand-800">內部流程管理系統</h1>
+              <p className="text-lg font-bold text-slate-600">簽呈、任務、通知一次整合</p>
             </div>
 
-            <div className="rounded-lg border border-white/80 bg-white/95 p-6 shadow-[0_18px_48px_rgba(15,23,42,0.12)] backdrop-blur sm:p-9">
+            <div className="rounded-lg border border-white/80 bg-white/95 p-6 shadow-[0_22px_60px_rgba(15,23,42,0.14)] backdrop-blur sm:p-9">
               <div className="mb-7 grid justify-items-center gap-3 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-50 text-brand-700">
-                  <LockKeyhole className="h-8 w-8" />
-                </div>
+                <img className="h-20 w-20 rounded-2xl object-cover shadow-sm" src="/app-icon-192.png" alt="JU數位管理" />
                 <div>
                   <h2 className="text-3xl font-black text-slate-950">登入系統</h2>
                   <div className="mx-auto mt-4 h-px w-14 bg-slate-300" />
@@ -225,16 +228,16 @@ function LoginShell() {
               <LoginForm />
             </div>
 
-            <p className="mt-5 text-center text-sm font-semibold text-slate-500">Supervisor Pilot v0.1 · Approval Lite Mode</p>
+            <p className="mt-5 text-center text-sm font-semibold text-slate-500">JU數位管理 · 內部流程管理</p>
           </div>
         </section>
 
-        <section className="rounded-lg border border-white bg-white p-4 shadow-soft lg:col-span-2 lg:p-6">
+        <section className="rounded-lg border border-white/80 bg-white/90 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.08)] backdrop-blur lg:col-span-2 lg:p-6">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <BenefitItem icon={ShieldCheck} title="安全可靠" body="登入驗證與權限控管，保護公司資料。" />
-            <BenefitItem icon={CheckCircle2} title="快速高效" body="簡化簽核流程，減少紙本往返。" />
-            <BenefitItem icon={Smartphone} title="行動便利" body="支援手機操作，外出也能追蹤進度。" />
-            <BenefitItem icon={BarChart3} title="統計追蹤" body="工作進度與待辦事項清楚掌握。" />
+            <BenefitItem icon={CheckCircle2} title="流程清楚" body="送出、審核、退回與核准都有紀錄。" />
+            <BenefitItem icon={Smartphone} title="手機可用" body="支援網頁、iPhone PWA 與 Android App。" />
+            <BenefitItem icon={BarChart3} title="追蹤方便" body="待辦、通知與進度更容易掌握。" />
           </div>
         </section>
       </div>

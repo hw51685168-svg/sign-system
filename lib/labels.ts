@@ -9,8 +9,8 @@ import {
   IssueStatus,
   IssueType,
   RoleKey,
-  ShipmentStatus,
   ServiceRequestStatus,
+  ShipmentStatus,
   TaskPriority,
   TaskStatus
 } from "@prisma/client";
@@ -28,6 +28,7 @@ export const roleLabels: Record<RoleKey, string> = {
   MANAGER: "主管",
   STAFF: "部門人員",
   STORE_STAFF: "門市人員",
+  STORE_REQUESTER: "門市申請與溝通",
   SYSTEM_ADMIN: "系統管理員",
   TESTER: "測試人員"
 };
@@ -49,7 +50,7 @@ export const approvalStatusLabels: Record<ApprovalStatus, string> = {
   DRAFT: "草稿",
   SUBMITTED: "已送出",
   REVIEWING: "審核中",
-  NEEDS_REVISION: "退回補件",
+  NEEDS_REVISION: "退回修改",
   APPROVED: "已核准",
   REJECTED: "已駁回",
   IN_PROGRESS: "執行中",
@@ -60,7 +61,7 @@ export const approvalActionLabels: Record<ApprovalAction, string> = {
   SUBMIT: "送出",
   APPROVE: "核准",
   REJECT: "駁回",
-  REQUEST_REVISION: "退回補件",
+  REQUEST_REVISION: "退回修改",
   ADD_APPROVER: "加簽",
   TRANSFER: "轉派",
   COMMENT: "留言",
@@ -75,11 +76,11 @@ export const taskPriorityLabels: Record<TaskPriority, string> = {
 };
 
 export const taskStatusLabels: Record<TaskStatus, string> = {
-  NOT_STARTED: "未開始",
-  IN_PROGRESS: "進行中",
-  WAITING_CONFIRMATION: "待確認",
-  REJECTED: "駁回修改",
-  COMPLETED: "已完成",
+  NOT_STARTED: "待處理",
+  IN_PROGRESS: "處理中",
+  WAITING_CONFIRMATION: "待交辦人確認",
+  REJECTED: "退回補充",
+  COMPLETED: "已結案",
   OVERDUE: "已逾期",
   CANCELLED: "已取消"
 };
@@ -99,7 +100,7 @@ export const issueSeverityLabels: Record<IssueSeverity, string> = {
   LOW: "低",
   MEDIUM: "中",
   HIGH: "高",
-  CRITICAL: "嚴重"
+  CRITICAL: "重大"
 };
 
 export const issueStatusLabels: Record<IssueStatus, string> = {
@@ -147,7 +148,7 @@ export const auditRecordStatusLabels: Record<AuditRecordStatus, string> = {
 };
 
 export function formatDateTime(date?: Date | string | null) {
-  if (!date) return "尚未設定";
+  if (!date) return "未指定";
   return new Intl.DateTimeFormat("zh-TW", {
     year: "numeric",
     month: "2-digit",
@@ -158,7 +159,7 @@ export function formatDateTime(date?: Date | string | null) {
 }
 
 export function formatDate(date?: Date | string | null) {
-  if (!date) return "未設定";
+  if (!date) return "未指定";
   return new Intl.DateTimeFormat("zh-TW", {
     year: "numeric",
     month: "2-digit",
@@ -166,11 +167,11 @@ export function formatDate(date?: Date | string | null) {
   }).format(new Date(date));
 }
 
-export function safeText(value: unknown, fallback = "未填寫") {
+export function safeText(value: unknown, fallback = "未指定") {
   if (value === null || value === undefined) return fallback;
   const text = String(value).trim();
   if (!text || text === "undefined" || text === "null" || text === "NaN") return fallback;
-  if (text.includes("????")) return fallback;
+  if (/\?{4,}/.test(text) || text.includes("\uFFFD")) return fallback;
   return text;
 }
 

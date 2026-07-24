@@ -1,9 +1,12 @@
-import { AlertTriangle, Bot, Bug, Github, ShieldAlert } from "lucide-react";
+import { AlertTriangle, Bot, Bug, CheckCircle2, Github, ShieldAlert } from "lucide-react";
 import { ErrorReportStatus, ErrorSeverity } from "@prisma/client";
 import { redirect } from "next/navigation";
+import type { ReactNode } from "react";
+
 import { PilotBanner } from "@/components/pilot-banner";
 import { LinkButton, PageHeader, Panel, StatusBadge } from "@/components/ui";
-import { errorSeverityLabels, errorSeverityTone, errorStatusLabels, errorStatusTone } from "@/lib/error-labels";
+import { codexFixStatusLabels, errorSeverityLabels, errorSeverityTone, errorStatusLabels, errorStatusTone } from "@/lib/error-labels";
+import { pendingCodexFixStatuses, unresolvedErrorStatuses } from "@/lib/error-status";
 import { formatDateTime, safeText } from "@/lib/labels";
 import { canAccessErrorCommandCenter } from "@/lib/error-command-center";
 import { prisma } from "@/lib/prisma";
@@ -13,19 +16,40 @@ function optionValues<T extends string>(values: Record<string, T> | T[]) {
   return Array.isArray(values) ? values : Object.values(values);
 }
 
+function StatCard({
+  icon,
+  value,
+  label
+}: {
+  icon: ReactNode;
+  value: number;
+  label: string;
+}) {
+  return (
+    <Panel>
+      {icon}
+      <p className="mt-2 text-4xl font-black">{value}</p>
+      <p className="text-sm font-bold text-slate-600">{label}</p>
+    </Panel>
+  );
+}
+
 export default async function AdminErrorsPage({
   searchParams
 }: {
-  searchParams?: { severity?: ErrorSeverity; status?: ErrorReportStatus; q?: string };
+  searchParams?: Promise<{ severity?: ErrorSeverity; status?: ErrorReportStatus; q?: string }>;
 }) {
+  const parsedSearchParams = (await searchParams) ?? {};
   const user = await requireUser();
   if (!canAccessErrorCommandCenter(user)) {
     redirect("/dashboard");
   }
 
-  const severity = searchParams?.severity && optionValues(ErrorSeverity).includes(searchParams.severity) ? searchParams.severity : undefined;
-  const status = searchParams?.status && optionValues(ErrorReportStatus).includes(searchParams.status) ? searchParams.status : undefined;
-  const q = searchParams?.q?.trim();
+  const severity =
+    parsedSearchParams.severity && optionValues(ErrorSeverity).includes(parsedSearchParams.severity) ? parsedSearchParams.severity : undefined;
+  const status =
+    parsedSearchParams.status && optionValues(ErrorReportStatus).includes(parsedSearchParams.status) ? parsedSearchParams.status : undefined;
+  const q = parsedSearchParams.q?.trim();
   const where = {
     ...(severity ? { severity } : {}),
     ...(status ? { status } : {}),
@@ -43,18 +67,28 @@ export default async function AdminErrorsPage({
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
-  const [errors, p0Count, p1Count, todayCount, unresolvedCount, codexCount, githubCount] = await Promise.all([
+  const [
+    errors,
+    p0Count,
+    p1Count,
+    todayCount,
+    unresolvedCount,
+    pendingCodexCount,
+    closedCodexCount,
+    githubCount
+  ] = await Promise.all([
     prisma.errorReport.findMany({
       where,
       include: { user: true, codexFixRequests: true },
       orderBy: [{ severity: "asc" }, { lastSeenAt: "desc" }],
       take: 80
     }),
-    prisma.errorReport.count({ where: { severity: "P0", status: { notIn: ["CLOSED", "IGNORED", "VERIFIED"] } } }),
-    prisma.errorReport.count({ where: { severity: "P1", status: { notIn: ["CLOSED", "IGNORED", "VERIFIED"] } } }),
-    prisma.errorReport.count({ where: { lastSeenAt: { gte: todayStart } } }),
-    prisma.errorReport.count({ where: { isResolved: false } }),
-    prisma.codexFixRequest.count(),
+    prisma.errorReport.count({ where: { severity: "P0", status: { in: unresolvedErrorStatuses } } }),
+    prisma.errorReport.count({ where: { severity: "P1", status: { in: unresolvedErrorStatuses } } }),
+    prisma.errorReport.count({ where: { lastSeenAt: { gte: todayStart }, status: { not: "IGNORED" } } }),
+    prisma.errorReport.count({ where: { status: { in: unresolvedErrorStatuses }, isResolved: false } }),
+    prisma.codexFixRequest.count({ where: { status: { in: pendingCodexFixStatuses } } }),
+    prisma.codexFixRequest.count({ where: { status: { in: ["FIXED", "VERIFIED", "CLOSED"] } } }),
     prisma.errorReport.count({ where: { githubIssueUrl: { not: null } } })
   ]);
 
@@ -63,17 +97,19 @@ export default async function AdminErrorsPage({
       <PilotBanner compact />
       <PageHeader
         title="Error Command Center（錯誤指揮中心）"
-        description="自動收集主管測試期間的前端、API、PWA、語音、簽呈與任務錯誤，並產生 Codex 修復單。"
+        description="自動收集前端、API、PWA、語音、簽呈與任務錯誤，並產生 Codex 修復單。狀態會同步顯示錯誤與修復單目前處理進度。"
         actions={<LinkButton href="/admin/pilot/status" variant="secondary">查看主管測試狀態</LinkButton>}
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-        <Panel><ShieldAlert className="h-7 w-7 text-red-700" /><p className="mt-2 text-4xl font-black">{p0Count}</p><p className="text-sm font-bold text-slate-600">P0 阻擋測試</p></Panel>
-        <Panel><AlertTriangle className="h-7 w-7 text-amber-600" /><p className="mt-2 text-4xl font-black">{p1Count}</p><p className="text-sm font-bold text-slate-600">P1 嚴重</p></Panel>
-        <Panel><Bug className="h-7 w-7 text-brand-700" /><p className="mt-2 text-4xl font-black">{todayCount}</p><p className="text-sm font-bold text-slate-600">今日錯誤</p></Panel>
-        <Panel><Bug className="h-7 w-7 text-brand-700" /><p className="mt-2 text-4xl font-black">{unresolvedCount}</p><p className="text-sm font-bold text-slate-600">未解決</p></Panel>
-        <Panel><Bot className="h-7 w-7 text-brand-700" /><p className="mt-2 text-4xl font-black">{codexCount}</p><p className="text-sm font-bold text-slate-600">Codex 修復單</p></Panel>
-        <Panel><Github className="h-7 w-7 text-brand-700" /><p className="mt-2 text-4xl font-black">{githubCount}</p><p className="text-sm font-bold text-slate-600">GitHub Issue</p></Panel>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-8">
+        <StatCard icon={<ShieldAlert className="h-7 w-7 text-red-700" />} value={p0Count} label="P0 未解決" />
+        <StatCard icon={<AlertTriangle className="h-7 w-7 text-amber-600" />} value={p1Count} label="P1 未解決" />
+        <StatCard icon={<Bug className="h-7 w-7 text-brand-700" />} value={todayCount} label="今日錯誤" />
+        <StatCard icon={<Bug className="h-7 w-7 text-brand-700" />} value={unresolvedCount} label="未解決錯誤" />
+        <StatCard icon={<Bot className="h-7 w-7 text-brand-700" />} value={pendingCodexCount} label="待處理修復單" />
+        <StatCard icon={<CheckCircle2 className="h-7 w-7 text-emerald-700" />} value={closedCodexCount} label="已完成修復單" />
+        <StatCard icon={<Github className="h-7 w-7 text-brand-700" />} value={githubCount} label="GitHub Issue" />
+        <StatCard icon={<Bot className="h-7 w-7 text-slate-700" />} value={pendingCodexCount + closedCodexCount} label="修復單總數" />
       </div>
 
       <Panel className="mt-5">
@@ -97,43 +133,48 @@ export default async function AdminErrorsPage({
 
       <Panel className="mt-5">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1200px] text-left text-base">
+          <table className="w-full min-w-[1280px] text-left text-base">
             <thead className="border-b border-slate-200 bg-slate-50 text-slate-800">
               <tr>
                 <th className="px-3 py-3">錯誤</th>
                 <th className="px-3 py-3">等級</th>
-                <th className="px-3 py-3">狀態</th>
+                <th className="px-3 py-3">錯誤狀態</th>
+                <th className="px-3 py-3">修復單狀態</th>
                 <th className="px-3 py-3">route（頁面）</th>
                 <th className="px-3 py-3">module（模組）</th>
                 <th className="px-3 py-3">使用者</th>
                 <th className="px-3 py-3">次數</th>
-                <th className="px-3 py-3">Codex</th>
                 <th className="px-3 py-3">最後發生</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {errors.map((error) => (
-                <tr key={error.id} className="align-top hover:bg-slate-50">
-                  <td className="px-3 py-3">
-                    <a className="font-black text-brand-800 hover:underline" href={`/admin/errors/${error.id}`}>{error.title}</a>
-                    <p className="mt-1 max-w-md truncate text-sm text-slate-600">{error.message}</p>
-                  </td>
-                  <td className="px-3 py-3"><StatusBadge label={errorSeverityLabels[error.severity]} tone={errorSeverityTone(error.severity)} /></td>
-                  <td className="px-3 py-3"><StatusBadge label={errorStatusLabels[error.status]} tone={errorStatusTone(error.status)} /></td>
-                  <td className="px-3 py-3">{safeText(error.route, "未提供")}</td>
-                  <td className="px-3 py-3">{safeText(error.module, "未提供")}</td>
-                  <td className="px-3 py-3">{safeText(error.user?.name ?? error.userRole, "未登入或未知")}</td>
-                  <td className="px-3 py-3">{error.occurrenceCount}</td>
-                  <td className="px-3 py-3">
-                    {error.codexFixRequests[0] ? (
-                      <a className="font-bold text-brand-700 hover:underline" href={`/admin/codex-fix-requests/${error.codexFixRequests[0].id}`}>查看修復單</a>
-                    ) : (
-                      "尚未建立"
-                    )}
-                  </td>
-                  <td className="px-3 py-3">{formatDateTime(error.lastSeenAt)}</td>
-                </tr>
-              ))}
+              {errors.map((error) => {
+                const fixRequest = error.codexFixRequests[0];
+                return (
+                  <tr key={error.id} className="align-top hover:bg-slate-50">
+                    <td className="px-3 py-3">
+                      <a className="font-black text-brand-800 hover:underline" href={`/admin/errors/${error.id}`}>{error.title}</a>
+                      <p className="mt-1 max-w-md truncate text-sm text-slate-600">{error.message}</p>
+                    </td>
+                    <td className="px-3 py-3"><StatusBadge label={errorSeverityLabels[error.severity]} tone={errorSeverityTone(error.severity)} /></td>
+                    <td className="px-3 py-3"><StatusBadge label={errorStatusLabels[error.status]} tone={errorStatusTone(error.status)} /></td>
+                    <td className="px-3 py-3">
+                      {fixRequest ? (
+                        <a className="font-bold text-brand-700 hover:underline" href={`/admin/codex-fix-requests/${fixRequest.id}`}>
+                          <StatusBadge label={codexFixStatusLabels[fixRequest.status]} tone={errorStatusTone(fixRequest.status)} />
+                        </a>
+                      ) : (
+                        <StatusBadge label="尚未建立" tone="slate" />
+                      )}
+                    </td>
+                    <td className="px-3 py-3">{safeText(error.route, "未記錄")}</td>
+                    <td className="px-3 py-3">{safeText(error.module, "未記錄")}</td>
+                    <td className="px-3 py-3">{safeText(error.user?.name ?? error.userRole, "未登入或未記錄")}</td>
+                    <td className="px-3 py-3">{error.occurrenceCount}</td>
+                    <td className="px-3 py-3">{formatDateTime(error.lastSeenAt)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

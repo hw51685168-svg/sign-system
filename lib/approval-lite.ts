@@ -12,17 +12,27 @@ export const approvalLiteStatusLabels: Record<ApprovalStatus, string> = {
   CLOSED: "已結案"
 };
 
+const descriptionHeading = "說明事項";
+const solutionHeading = "解決 / 執行方式";
+
 export function buildApprovalDescription(description: string, solution: string) {
-  return [`【說明事項】\n${description.trim()}`, `【解決 / 執行方式】\n${solution.trim()}`].join("\n\n");
+  return [`${descriptionHeading}\n${description.trim()}`, `${solutionHeading}\n${solution.trim()}`].join("\n\n");
 }
 
 export function parseApprovalDescription(value: string | null | undefined) {
   const text = value?.trim() || "";
-  const descriptionMatch = text.match(/【說明事項】\s*([\s\S]*?)(?=\n\s*【解決 \/ 執行方式】|$)/);
-  const solutionMatch = text.match(/【解決 \/ 執行方式】\s*([\s\S]*)$/);
+  const solutionIndex = text.indexOf(solutionHeading);
+
+  if (solutionIndex >= 0) {
+    return {
+      description: text.slice(0, solutionIndex).replace(descriptionHeading, "").trim(),
+      solution: text.slice(solutionIndex + solutionHeading.length).trim()
+    };
+  }
+
   return {
-    description: (descriptionMatch?.[1] || text).trim(),
-    solution: (solutionMatch?.[1] || "").trim()
+    description: text.replace(descriptionHeading, "").trim(),
+    solution: ""
   };
 }
 
@@ -41,9 +51,11 @@ export function approvalStageLabel(
 ) {
   if (approval.status === "REVIEWING") {
     const step = currentApprovalStep(approval);
-    if (step?.title.includes("總經理") || step?.stepOrder === 2) return "總經理審核中";
-    return "部門主管審核中";
+    if (step?.title.includes("總經理")) return "待總經理簽核";
+    if (step?.title.includes("承辦") || step?.title.includes("處理")) return "待承辦部門處理";
+    return step?.title ? `${step.title}中` : "待相關部門主管簽核";
   }
+
   return approvalLiteStatusLabels[approval.status];
 }
 
@@ -52,6 +64,7 @@ export function approvalProgressFilter(value?: string) {
   if (value === "approved") return { status: "APPROVED" as ApprovalStatus };
   if (value === "revision") return { status: "NEEDS_REVISION" as ApprovalStatus };
   if (value === "rejected") return { status: "REJECTED" as ApprovalStatus };
+  if (value === "returned") return { status: { in: ["NEEDS_REVISION", "REJECTED"] as ApprovalStatus[] } };
   return {};
 }
 

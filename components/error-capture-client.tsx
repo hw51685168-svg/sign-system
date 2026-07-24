@@ -16,7 +16,7 @@ type ClientErrorSeverity = "P0" | "P1" | "P2" | "P3";
 const MAX_BREADCRUMBS = 25;
 const BREADCRUMB_KEY = "huangxiang_error_breadcrumbs";
 const SESSION_KEY = "huangxiang_error_session_id";
-const TRANSIENT_FETCH_ENDPOINTS = ["/api/notifications/recent", "/api/push/status"];
+const TRANSIENT_FETCH_ENDPOINTS = ["/api/notifications/recent", "/api/push/status", "/api/auth/session"];
 
 function getSessionId() {
   if (typeof window === "undefined") return "";
@@ -86,8 +86,10 @@ function isTransientFetchFailure(url: string, error: unknown) {
   return isTransientMessage && TRANSIENT_FETCH_ENDPOINTS.some((endpoint) => url.includes(endpoint));
 }
 
-function severityForFetchFailure(url: string, error: unknown): ClientErrorSeverity {
-  return isTransientFetchFailure(url, error) ? "P3" : "P1";
+function severityForApiStatus(url: string, status: number): ClientErrorSeverity {
+  if (TRANSIENT_FETCH_ENDPOINTS.some((endpoint) => url.includes(endpoint))) return "P3";
+  if (status >= 500) return "P1";
+  return "P2";
 }
 
 export async function reportClientError(input: {
@@ -154,6 +156,17 @@ export function ErrorCaptureClient() {
 
     const onUnhandledRejection = (event: PromiseRejectionEvent) => {
       const reason = event.reason instanceof Error ? event.reason : new Error(String(event.reason || "Unhandled promise rejection"));
+      if (reason.message.includes("pushManager") || reason.message.includes("getSubscription")) {
+        reportClientError({
+          title: "Push support check failed",
+          message: reason.message,
+          module: "pwa",
+          action: "window.onunhandledrejection",
+          stackTrace: reason.stack,
+          severity: "P3"
+        });
+        return;
+      }
       reportClientError({
         title: "Unhandled promise rejection",
         message: reason.message,
@@ -200,28 +213,28 @@ export function ErrorCaptureClient() {
       try {
         const response = await originalFetch(input, init);
         if (url.includes("/api/") && response.status >= 500 && !url.includes("/api/errors/report")) {
+          const severity = severityForApiStatus(url, response.status);
           reportClientError({
             title: `API ${response.status} error`,
             message: `API 回應 ${response.status}`,
             module: "api",
             action: `${init?.method || "GET"} ${url}`,
-            severity: "P1",
+            severity,
             statusCode: response.status,
-            context: { url, status: response.status }
+            context: { url, status: response.status, transient: severity === "P3" }
           });
         }
         return response;
       } catch (error) {
-        if (!url.includes("/api/errors/report")) {
-          const severity = severityForFetchFailure(url, error);
+        if (!url.includes("/api/errors/report") && !isTransientFetchFailure(url, error)) {
           reportClientError({
-            title: severity === "P3" ? "暫時無法取得通知狀態" : "Fetch failed",
+            title: "Fetch failed",
             message: error instanceof Error ? error.message : "網路請求失敗",
             module: "api",
             action: `${init?.method || "GET"} ${url}`,
             stackTrace: error instanceof Error ? error.stack : undefined,
-            severity,
-            context: { url, transient: severity === "P3" }
+            severity: "P1",
+            context: { url }
           });
         }
         throw error;
